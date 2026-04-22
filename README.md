@@ -1,8 +1,9 @@
-# CYBERSICKER — Cyberattack Detection System for IoT Environments
+# CYBERSICKER — Agentic AI Cyberattack Detection for IoT Environments
 
-> **AI-Powered Security Operations Center via Hybrid Intelligence**  
+> **Autonomous LLM-Powered Security Operations Center for IoT Threat Detection & Response**  
 > Built by **Vrishin Ram.K** | Dhanalakshmi Srinivasan University, Dept. of Cybersecurity
 
+***REMOVED***!***REMOVED***Agentic AI***REMOVED***(https://img.shields.io/badge/Type-Agentic%20AI-purple)***REMOVED***(https://python.langchain.com/docs/concepts/agents)
 ***REMOVED***!***REMOVED***Python***REMOVED***(https://img.shields.io/badge/Python-3.9+-blue)***REMOVED***(https://www.python.org/)
 ***REMOVED***!***REMOVED***License***REMOVED***(https://img.shields.io/badge/License-MIT-green)***REMOVED***(#license)
 ***REMOVED***!***REMOVED***LLM***REMOVED***(https://img.shields.io/badge/LLM-Google%20Gemini%202.5%20Flash-red)***REMOVED***(https://ai.google.dev/)
@@ -11,17 +12,32 @@
 
 ## 🎯 Project Overview
 
-**CYBERSICKER** is an AI-powered **Security Operations Center (SOC)** platform designed to detect, analyze, and respond to cyber threats targeting **Internet of Things (IoT)** environments. It combines **deep learning anomaly detection** with an **autonomous LLM-powered agent** that can investigate threats using real-world threat intelligence APIs and an internal incident response playbook.
+**CYBERSICKER** is a **dual-core intelligent system** that fuses **agentic AI** with **IoT cyberattack detection**:
 
-### Core Idea
+🤖 **Agentic AI Core:** Autonomous LLM agent (Google Gemini 2.5 Flash) that orchestrates 5+ security tools to investigate threats, query threat intelligence APIs, and consult incident response playbooks.  
+🔍 **Detection Core:** Deep learning autoencoder + ML anomaly detection on network traffic to identify botnet infections, DDoS attacks, ransomware, and lateral movement in IoT environments.
 
-The system simulates a **blue-team SOC analyst** — it can:
-- ✅ Scan network traffic logs for anomalies using an autoencoder neural network
-- ✅ Investigate suspicious IPs via VirusTotal
-- ✅ Look up device manufacturers by MAC address
-- ✅ Query the NIST CVE database
-- ✅ Consult an internal incident response playbook
-- ✅ Orchestrate everything autonomously via Google Gemini LLM agent
+It simulates an **autonomous blue-team SOC analyst** that can independently reason, make decisions, and respond to security incidents in real-time.
+
+### The Dual-Core System
+
+#### 🤖 **Agentic AI Engine**
+- **Brain:** Google Gemini 2.5 Flash LLM
+- **Framework:** LangChain agent orchestrator
+- **Tools:** 5 autonomous security investigation tools
+  - Network anomaly scanner (autoencoder)
+  - VirusTotal IP reputation checker
+  - MAC address device lookup
+  - NIST CVE database queries
+  - Incident response playbook consultant (RAG)
+- **Capability:** Autonomous reasoning, tool selection, threat analysis
+
+#### 🔍 **IoT Threat Detection**
+- **Algorithm:** Deep neural network autoencoder + PCA
+- **Dataset:** NSL-KDD (19 MB labeled network traffic)
+- **Detects:** Botnet infections, DDoS floods, ransomware, lateral movement
+- **Accuracy:** Real-time anomaly scoring (MSE threshold-based)
+- **Output:** Flagged records with anomaly count & percentage
 
 ---
 
