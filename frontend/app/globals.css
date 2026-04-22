@@ -1,0 +1,407 @@
+@import "tailwindcss";
+
+/* ═══════════ CUSTOM THEME ═══════════ */
+@theme {
+  --color-bg-primary: #050810;
+  --color-bg-secondary: #0a0f1c;
+  --color-bg-card: rgba(10, 18, 35, 0.6);
+  --color-bg-card-solid: #0a1223;
+  --color-bg-input: rgba(8, 14, 28, 0.8);
+  --color-border: rgba(0, 240, 255, 0.08);
+  --color-border-active: rgba(0, 240, 255, 0.25);
+
+  --color-cyan: #00f0ff;
+  --color-cyan-dim: rgba(0, 240, 255, 0.5);
+  --color-cyan-muted: rgba(0, 240, 255, 0.15);
+  --color-red: #ff003c;
+  --color-red-dim: rgba(255, 0, 60, 0.5);
+  --color-red-muted: rgba(255, 0, 60, 0.15);
+  --color-green: #00ff88;
+  --color-green-dim: rgba(0, 255, 136, 0.5);
+  --color-amber: #ffaa00;
+  --color-text: #c8d6e5;
+  --color-text-muted: #4a5568;
+
+  --font-display: 'Orbitron', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+}
+
+/* ═══════════ GLOBAL RESET ═══════════ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 240, 255, 0.15) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.15);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.35);
+}
+
+html {
+  background: #030508;
+}
+
+body {
+  font-family: var(--font-mono);
+  background: radial-gradient(ellipse at 50% 0%, #0c1529 0%, #06090f 40%, #030508 70%);
+  color: var(--color-text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ═══════════ GLASSMORPHISM UTILITIES ═══════════ */
+.glass {
+  background: rgba(8, 15, 30, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 240, 255, 0.07);
+  border-radius: 16px;
+}
+
+.glass-strong {
+  background: rgba(8, 15, 30, 0.72);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(0, 240, 255, 0.1);
+  border-radius: 16px;
+}
+
+.glass-card {
+  background: rgba(8, 15, 30, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 240, 255, 0.06);
+  border-radius: 14px;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(0, 240, 255, 0.18);
+  box-shadow:
+    0 8px 40px rgba(0, 240, 255, 0.06),
+    0 0 60px rgba(0, 240, 255, 0.03);
+  transform: translateY(-2px);
+}
+
+/* ═══════════ FLOATING SHADOW UTILITIES ═══════════ */
+.float-shadow-cyan {
+  box-shadow:
+    0 4px 30px rgba(0, 240, 255, 0.04),
+    0 10px 60px rgba(0, 240, 255, 0.02),
+    0 0 1px rgba(0, 240, 255, 0.15);
+}
+
+.float-shadow-red {
+  box-shadow:
+    0 4px 30px rgba(255, 0, 60, 0.06),
+    0 10px 60px rgba(255, 0, 60, 0.03),
+    0 0 1px rgba(255, 0, 60, 0.2);
+}
+
+.float-shadow-green {
+  box-shadow:
+    0 4px 30px rgba(0, 255, 136, 0.04),
+    0 10px 60px rgba(0, 255, 136, 0.02),
+    0 0 1px rgba(0, 255, 136, 0.15);
+}
+
+/* ═══════════ ANIMATIONS ═══════════ */
+@keyframes pulse-badge {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 60, 0.4), 0 0 12px rgba(255, 0, 60, 0.3);
+***REMOVED***
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 0, 60, 0), 0 0 24px rgba(255, 0, 60, 0.15);
+***REMOVED***
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+***REMOVED***
+  100% {
+    transform: translateY(100vh);
+***REMOVED***
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.6;
+***REMOVED***
+  50% {
+    opacity: 1;
+***REMOVED***
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+***REMOVED***
+  to {
+    opacity: 1;
+    transform: translateY(0);
+***REMOVED***
+}
+
+.animate-pulse-badge {
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+.animate-scanline {
+  animation: scanline 8s linear infinite;
+}
+
+.animate-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+/* ═══════════ SCAN-LINE OVERLAY ═══════════ */
+.scanline-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.03) 20%,
+    rgba(0, 240, 255, 0.07) 50%,
+    rgba(0, 240, 255, 0.03) 80%,
+    transparent 100%
+  );
+  z-index: 9999;
+  pointer-events: none;
+  animation: scanline 8s linear infinite;
+}
+
+/* ═══════════ TERMINAL STYLES ═══════════ */
+.terminal-log {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.65;
+  color: rgba(0, 255, 136, 0.8);
+}
+
+.terminal-log .log-timestamp {
+  color: rgba(0, 240, 255, 0.5);
+}
+
+.terminal-log .log-warn {
+  color: #ffaa00;
+}
+
+.terminal-log .log-error {
+  color: #ff003c;
+}
+
+.terminal-log .log-info {
+  color: rgba(0, 255, 136, 0.7);
+}
+
+/* ═══════════ NEON BUTTON ═══════════ */
+.btn-tool {
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.12);
+  color: rgba(0, 240, 255, 0.85);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.btn-tool:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.3);
+  color: #00f0ff;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.1), 0 0 40px rgba(0, 240, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.btn-tool:active {
+  transform: translateY(0);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.08);
+}
+
+.btn-send {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 0.65rem 1.5rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(0, 240, 255, 0.08));
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  color: #00f0ff;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.btn-send:hover {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(0, 240, 255, 0.12));
+  border-color: rgba(0, 240, 255, 0.45);
+  box-shadow:
+    0 0 25px rgba(0, 240, 255, 0.15),
+    0 0 50px rgba(0, 240, 255, 0.06),
+    inset 0 0 15px rgba(0, 240, 255, 0.05);
+}
+
+/* ═══════════ METRIC CARD ACCENT BARS ═══════════ */
+.accent-left-cyan {
+  border-left: 3px solid rgba(0, 240, 255, 0.5);
+}
+.accent-left-green {
+  border-left: 3px solid rgba(0, 255, 136, 0.5);
+}
+.accent-left-red {
+  border-left: 3px solid rgba(255, 0, 60, 0.5);
+}
+.accent-left-amber {
+  border-left: 3px solid rgba(255, 170, 0, 0.5);
+}
+
+/* ═══════════ CHAT BUBBLES ═══════════ */
+.chat-bubble-user {
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.1);
+  border-radius: 14px 14px 4px 14px;
+}
+
+.chat-bubble-ai {
+  background: rgba(0, 255, 136, 0.04);
+  border: 1px solid rgba(0, 255, 136, 0.08);
+  border-radius: 14px 14px 14px 4px;
+}
+
+/* ═══════════ INPUT GLOW ═══════════ */
+.input-glow {
+  background: rgba(8, 14, 28, 0.8);
+  border: 1px solid rgba(0, 240, 255, 0.1);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  font-family: var(--font-mono);
+  color: var(--color-text);
+}
+
+.input-glow:focus {
+  outline: none;
+  border-color: rgba(0, 240, 255, 0.35);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.08), 0 0 40px rgba(0, 240, 255, 0.03);
+}
+
+.input-glow::placeholder {
+  color: rgba(74, 85, 104, 0.7);
+}
+
+/* ═══════════ CYBER DESIGN SYSTEM TOKENS ═══════════ */
+:root {
+  --cyber-bg-0: #06080d;
+  --cyber-bg-1: #0b1020;
+  --cyber-bg-2: #121a2b;
+  --cyber-stroke: #1f2a44;
+  --cyber-accent-green: #00ff9d;
+  --cyber-accent-cyan: #00d1ff;
+  --cyber-accent-violet: #7c5cff;
+  --cyber-danger: #ff3b5c;
+  --cyber-warning: #ffb020;
+  --cyber-text-main: #e6edf7;
+  --cyber-text-muted: #93a4c3;
+  --cyber-text-dim: #62708a;
+}
+
+/* Use as background layer behind dashboards for a subtle tactical grid. */
+.bg-cyber-grid {
+  background-image:
+    linear-gradient(to right, rgba(0, 209, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 209, 255, 0.06) 1px, transparent 1px),
+    radial-gradient(120% 80% at 50% 0%, rgba(0, 209, 255, 0.08), transparent 60%);
+  background-size:
+    48px 48px,
+    48px 48px,
+    100% 100%;
+  background-position: center center;
+}
+
+.cyber-panel {
+  background: color-mix(in srgb, var(--cyber-bg-1) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cyber-accent-cyan) 18%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px;
+}
+
+.cyber-focus-ring:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--cyber-accent-cyan) 65%, transparent),
+    0 0 22px color-mix(in srgb, var(--cyber-accent-cyan) 30%, transparent);
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+***REMOVED***
+  to {
+    opacity: 1;
+    transform: translateY(0);
+***REMOVED***
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out forwards;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 0, 60, 0.4); }
+  50% { box-shadow: 0 0 12px 4px rgba(255, 0, 60, 0.2); }
+}
+
+.animate-pulse-badge {
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes scanline {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-scanline {
+  animation: scanline 4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+***REMOVED***
+}

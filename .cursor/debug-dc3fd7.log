@@ -1,0 +1,1 @@
+{"sessionId":"dc3fd7","runId":"initial","hypothesisId":"H3","location":"app/page.tsx:chat:start","message":"Chat request started","data":{"endpoint":"http://localhost:8000/api/chat","promptLength":13},"timestamp":1776667863033}
