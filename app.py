@@ -355,8 +355,7 @@ with st.sidebar:
     st.markdown("""
     <div style="text-align:center; padding: 0.5rem 0 2rem 0;">
         <div style="color:#5c6b7e; font-size:0.55rem; letter-spacing:2px; text-transform:uppercase; line-height:1.8;">
-            🎓 Dhanalakshmi Srinivasan University<br/>
-            Department of Cybersecurity
+            🛡️ CYBERSICKER Threat Detection Suite
         </div>
         <div style="color:#00f0ff88; font-size:0.6rem; margin-top:6px; letter-spacing:1px;">
             Built by <strong style="color:#00f0ff;">Vrishin Ram.K</strong>

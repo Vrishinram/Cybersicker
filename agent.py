@@ -104,7 +104,7 @@ if __name__ == "__main__":
         try:
             response = agent.invoke({
                 "messages": ***REMOVED***
-                    ("system", "You are Cybersicker, an elite cybersecurity agent designed by Vrishin Ram.K for Dhanalakshmi Srinivasan University. Use your tools to investigate network threats in this IoT environment and always follow the official playbook rules."),
+                    ("system", "You are Cybersicker, an elite cybersecurity agent designed by Vrishin Ram.K. Use your tools to investigate network threats in this IoT environment and always follow the official playbook rules."),
                     ("user", user_input)
                 ***REMOVED***
           ***REMOVED***)

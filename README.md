@@ -1,7 +1,7 @@
 # CYBERSICKER — Agentic AI Cyberattack Detection for IoT Environments
 
 > **Autonomous LLM-Powered Security Operations Center for IoT Threat Detection & Response**  
-> Built by **Vrishin Ram.K** | Dhanalakshmi Srinivasan University, Dept. of Cybersecurity
+> Built by **Vrishin Ram.K**
 
 ***REMOVED***!***REMOVED***Agentic AI***REMOVED***(https://img.shields.io/badge/Type-Agentic%20AI-purple)***REMOVED***(https://python.langchain.com/docs/concepts/agents)
 ***REMOVED***!***REMOVED***Python***REMOVED***(https://img.shields.io/badge/Python-3.9+-blue)***REMOVED***(https://www.python.org/)
@@ -403,7 +403,6 @@ This project is licensed under the **MIT License** — see ***REMOVED***LICENSE*
 ## 👤 Author
 
 **Vrishin Ram.K**  
-🏫 Dhanalakshmi Srinivasan University, Department of Cybersecurity  
 📧 ***REMOVED***Contact***REMOVED***(mailto:vrishinram.k@dsu.edu.in)
 
 ---

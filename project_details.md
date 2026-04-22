@@ -1,7 +1,7 @@
 # CYBERSICKER — Full Project Documentation
 
 > **Cyberattack Detection System for IoT Environments via Hybrid Intelligence**
-> Built by **Vrishin Ram.K** | Dhanalakshmi Srinivasan University, Dept. of Cybersecurity
+> Built by **Vrishin Ram.K**
 
 ---
 
