@@ -29,19 +29,19 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Orbitron:wght@500;700;900&display=swap');
 
 /* ═══════════ HIDE STREAMLIT DEFAULTS ═══════════ */
-#MainMenu, header, footer, ***REMOVED***data-testid="stToolbar"***REMOVED***,
-***REMOVED***data-testid="stDecoration"***REMOVED***, .stDeployButton {display: none !important;}
+#MainMenu, header, footer, [data-testid="stToolbar"],
+[data-testid="stDecoration"], .stDeployButton {display: none !important;}
 /* Hide any Material Icon text that leaks into the sidebar */
-section***REMOVED***data-testid="stSidebar"***REMOVED*** .material-symbols-rounded,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** ***REMOVED***data-testid="stSidebarNavLink"***REMOVED***,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** ***REMOVED***data-testid="stSidebarNavSeparator"***REMOVED***,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** ***REMOVED***data-testid="stSidebarHeader"***REMOVED***,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** .stPageLink,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** span.material-icons,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** ***REMOVED***data-testid="stSidebarNavItems"***REMOVED***,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** ***REMOVED***data-testid="stLogo"***REMOVED***,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** nav {display: none !important;}
-section***REMOVED***data-testid="stSidebarUserContent"***REMOVED*** {margin-top: 0 !important; padding-top: 1rem !important;}
+section[data-testid="stSidebar"] .material-symbols-rounded,
+section[data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
+section[data-testid="stSidebar"] [data-testid="stSidebarNavSeparator"],
+section[data-testid="stSidebar"] [data-testid="stSidebarHeader"],
+section[data-testid="stSidebar"] .stPageLink,
+section[data-testid="stSidebar"] span.material-icons,
+section[data-testid="stSidebar"] [data-testid="stSidebarNavItems"],
+section[data-testid="stSidebar"] [data-testid="stLogo"],
+section[data-testid="stSidebar"] nav {display: none !important;}
+section[data-testid="stSidebarUserContent"] {margin-top: 0 !important; padding-top: 1rem !important;}
 
 /* ═══════════ ROOT VARIABLES ═══════════ */
 :root {

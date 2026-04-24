@@ -10,15 +10,15 @@ load_dotenv(r"C:\Users\91638\Desktop\.env")
 # --- BULLETPROOF KEY CHECK ---
 google_key = os.environ.get("GOOGLE_API_KEY")
 if not google_key:
-    print("\n***REMOVED***🚨***REMOVED*** Google API Key not found in .env file!")
+    print("\n🚨 Google API Key not found in .env file!")
     google_key = getpass.getpass("Please paste your Gemini API Key and press Enter: ")
-    os.environ***REMOVED***"GOOGLE_API_KEY"***REMOVED*** = google_key
+    os.environ["GOOGLE_API_KEY"] = google_key
 
 vt_key = os.environ.get("VT_API_KEY")
 if not vt_key:
-    print("\n***REMOVED***🚨***REMOVED*** VirusTotal API Key not found in .env file!")
+    print("\n🚨 VirusTotal API Key not found in .env file!")
     vt_key = getpass.getpass("Please paste your VirusTotal API Key and press Enter: ")
-    os.environ***REMOVED***"VT_API_KEY"***REMOVED*** = vt_key
+    os.environ["VT_API_KEY"] = vt_key
 # -----------------------------
 
 from langchain.agents import create_agent
@@ -294,7 +294,7 @@ Recovery: Execute recovery procedures post-incident (RC.RP)
 # 3. The Agent Brain
 # We explicitly pass the google_key here so it cannot fail!
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, api_key=google_key)
-tools = ***REMOVED***network_scanner, check_ip_virustotal, consult_playbook***REMOVED***
+tools = [network_scanner, check_ip_virustotal, consult_playbook]
 agent = create_agent(llm, tools=tools)
 
 # 4. The Autonomous Execution Loop
@@ -308,25 +308,25 @@ if __name__ == "__main__":
     while True:
         user_input = input("Cybersicker > ")
         
-        if user_input.lower() in ***REMOVED***'exit', 'quit'***REMOVED***:
+        if user_input.lower() in ['exit', 'quit']:
             print("Shutting down Cybersicker defenses. Goodbye!")
             break
             
         try:
             response = agent.invoke({
-                "messages": ***REMOVED***
+                "messages": [
                     ("system", "You are Cybersicker, an elite cybersecurity agent designed by Vrishin Ram.K. Use your tools to investigate network threats in this IoT environment and always follow the official playbook rules."),
                     ("user", user_input)
-                ***REMOVED***
-          ***REMOVED***)
+                ]
+            })
             
             print("\n--- SOC Report ---")
-            final_content = response***REMOVED***"messages"***REMOVED******REMOVED***-1***REMOVED***.content
+            final_content = response["messages"][-1].content
             if isinstance(final_content, list):
-                print(final_content***REMOVED***0***REMOVED******REMOVED***"text"***REMOVED***)
+                print(final_content[0]["text"])
             else:
                 print(final_content)
             print("-" * 50 + "\n")
             
         except Exception as e:
-            print(f"\n***REMOVED***Error***REMOVED*** Cybersicker encountered an issue: {str(e)}\n")
+            print(f"\n❌ Error: Cybersicker encountered an issue: {str(e)}\n")

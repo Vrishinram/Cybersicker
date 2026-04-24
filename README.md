@@ -3,10 +3,10 @@
 > **Autonomous LLM-Powered Security Operations Center for IoT Threat Detection & Response**  
 > Built by **Vrishin Ram.K**
 
-***REMOVED***!***REMOVED***Agentic AI***REMOVED***(https://img.shields.io/badge/Type-Agentic%20AI-purple)***REMOVED***(https://python.langchain.com/docs/concepts/agents)
-***REMOVED***!***REMOVED***Python***REMOVED***(https://img.shields.io/badge/Python-3.9+-blue)***REMOVED***(https://www.python.org/)
-***REMOVED***!***REMOVED***License***REMOVED***(https://img.shields.io/badge/License-MIT-green)***REMOVED***(#license)
-***REMOVED***!***REMOVED***LLM***REMOVED***(https://img.shields.io/badge/LLM-Google%20Gemini%202.5%20Flash-red)***REMOVED***(https://ai.google.dev/)
+[![Agentic AI](https://img.shields.io/badge/Type-Agentic%20AI-purple)](https://python.langchain.com/docs/concepts/agents)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](#license)
+[![LLM](https://img.shields.io/badge/LLM-Google%20Gemini%202.5%20Flash-red)](https://ai.google.dev/)
 
 ---
 
