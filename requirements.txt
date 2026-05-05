@@ -16,3 +16,4 @@ scikit-learn
 sentence-transformers
 chromadb
 watchfiles
+pyjwt
