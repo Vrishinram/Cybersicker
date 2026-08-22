@@ -3,6 +3,7 @@ CYBERSICKER — ML Anomaly Detection Engine
 Deep autoencoder + PCA for IoT network traffic analysis.
 Caches and persists trained model + StandardScaler + PCA for fast inference.
 Supports TensorFlow / Keras with graceful scikit-learn MLP fallback if TensorFlow is absent.
+Includes sandboxed path verification and 50MB payload limits.
 """
 
 from __future__ import annotations
@@ -34,6 +35,11 @@ logger = logging.getLogger("Cybersicker.MLDetection")
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "models"
 MODEL_DIR.mkdir(exist_ok=True)
+SCANS_DIR = BASE_DIR / "data" / "scans"
+SCANS_DIR.mkdir(parents=True, exist_ok=True)
+
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+ALLOWED_EXTENSIONS = {".txt", ".csv"}
 
 MITRE_MAP = [
     {"id": "T1595", "name": "Active Scanning", "tactic": "Reconnaissance"},
@@ -45,19 +51,53 @@ MITRE_MAP = [
 ]
 
 
-def _load_numeric(filepath: str | Path) -> pd.DataFrame:
-    path = Path(filepath)
-    if not path.is_file():
-        fallback = BASE_DIR / "KDDTrain+.txt"
-        if fallback.is_file() and path.name in ("KDDTrain+.txt", "KDDTrain+.csv"):
-            path = fallback
-        else:
-            raise FileNotFoundError(f"Traffic file not found: {filepath}")
+def _validate_and_resolve_path(filepath: str | Path) -> Path:
+    """
+    Validate file exists, extension is permitted (.txt / .csv),
+    file size <= 50MB, and path is within permitted project or scans directory.
+    """
+    raw_path = Path(filepath)
 
+    # Allow direct fallback to repo KDDTrain+.txt
+    if raw_path.name in ("KDDTrain+.txt", "KDDTrain+.csv") and not raw_path.exists():
+        fallback = BASE_DIR / "KDDTrain+.txt"
+        if fallback.is_file():
+            return fallback
+
+    resolved = raw_path.resolve()
+
+    if not resolved.is_file():
+        # Check in SCANS_DIR
+        sandboxed = (SCANS_DIR / raw_path.name).resolve()
+        if sandboxed.is_file():
+            resolved = sandboxed
+        elif (BASE_DIR / raw_path.name).is_file():
+            resolved = (BASE_DIR / raw_path.name).resolve()
+        else:
+            raise FileNotFoundError(f"Traffic log file not found: {filepath}")
+
+    # Validate file extension
+    if resolved.suffix.lower() not in ALLOWED_EXTENSIONS:
+        raise ValueError(
+            f"Invalid file type '{resolved.suffix}'. Only .txt and .csv files are permitted."
+        )
+
+    # Validate file size (<= 50MB)
+    file_size = resolved.stat().st_size
+    if file_size > MAX_FILE_SIZE_BYTES:
+        raise ValueError(
+            f"File size ({file_size / (1024*1024):.2f} MB) exceeds maximum allowed limit of 50 MB."
+        )
+
+    return resolved
+
+
+def _load_numeric(filepath: str | Path) -> pd.DataFrame:
+    path = _validate_and_resolve_path(filepath)
     dataset = pd.read_csv(path, header=None)
     numeric = dataset.select_dtypes(include=["number"])
     if numeric.empty:
-        raise ValueError("No numeric columns found to analyze.")
+        raise ValueError("No numeric columns found to analyze in dataset.")
     return numeric
 
 
@@ -75,7 +115,6 @@ def _build_autoencoder(input_dim: int):
         model.compile(optimizer="adam", loss="mse")
         return model
     else:
-        # Fallback neural network autoencoder using scikit-learn MLPRegressor
         return MLPRegressor(
             hidden_layer_sizes=(16, 8, 16),
             activation="relu",
@@ -119,14 +158,7 @@ def analyze_network_data(
     Run ML-based anomaly detection using deep autoencoder and PCA.
     Persists and reloads model, scaler, and PCA artifacts in `models/`.
     """
-    path = Path(filepath)
-    if not path.is_file():
-        fallback = BASE_DIR / "KDDTrain+.txt"
-        if fallback.is_file() and path.name in ("KDDTrain+.txt", "KDDTrain+.csv"):
-            path = fallback
-        else:
-            raise FileNotFoundError(f"Traffic file not found: {filepath}")
-
+    path = _validate_and_resolve_path(filepath)
     numeric_data = _load_numeric(path)
     total = len(numeric_data)
 
@@ -168,7 +200,11 @@ def analyze_network_data(
         joblib.dump(scaler, scaler_path)
         joblib.dump(pca, pca_path)
         meta_path.write_text(
-            json.dumps({"input_dim": input_dim, "total_trained_samples": total, "backend": "tensorflow" if HAS_TF else "sklearn"}),
+            json.dumps({
+                "input_dim": input_dim,
+                "total_trained_samples": total,
+                "backend": "tensorflow" if HAS_TF else "sklearn"
+            }),
             encoding="utf-8",
         )
         trained = True
