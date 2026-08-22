@@ -367,117 +367,20 @@ with st.sidebar:
 # ==========================================
 # 4. THE TOOLS (unchanged backend logic)
 # ==========================================
-@tool
-def network_scanner(filepath: str) -> str:
-    """Scan network traffic logs for cyber attacks or anomalies."""
-    try:
-        anomalies = run_network_scan(filepath)
-        return f"Scan complete. Found {anomalies} anomalies."
-    except Exception as e:
-        return f"Failed to run scanner: {str(e)}"
+# ==========================================
+# 4. UNIFIED SECURITY TOOLS (Shared with CLI & API)
+# ==========================================
+from tools import (
+    ALL_TOOLS,
+    network_scanner,
+    check_ip_virustotal,
+    lookup_mac_address,
+    query_cve_database,
+    consult_playbook,
+    sanitize_input,
+    escape_output,
+)
 
-@tool
-def check_ip_virustotal(ip_address: str) -> str:
-    """Investigate an IP address using VirusTotal threat intelligence. Input MUST be an IPv4 address string."""
-    vt_api_key = os.environ.get("VT_API_KEY")
-    if not vt_api_key:
-        return "Error: VirusTotal API Key is missing in the sidebar."
-    
-    url = f"https://www.virustotal.com/api/v3/ip_addresses/{ip_address}"
-    headers = {"accept": "application/json", "x-apikey": vt_api_key}
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            stats = response.json()['data']['attributes']['last_analysis_stats']
-            malicious = stats.get('malicious', 0)
-            if malicious > 0:
-                return f"CRITICAL: {malicious} security vendors flagged {ip_address} as malicious!"
-            return f"CLEAN: 0 vendors flagged {ip_address} as malicious."
-        return f"Error: API returned status code {response.status_code}"
-    except Exception as e:
-        return f"Error connecting to VirusTotal: {str(e)}"
-
-@tool
-def lookup_mac_address(mac_address: str) -> str:
-    """Look up the manufacturer/vendor of a device by its MAC address. Input should be a MAC address like AA:BB:CC:DD:EE:FF."""
-    try:
-        clean_mac = mac_address.replace('-', ':').strip()
-        oui = clean_mac.replace(':', '')[:6].upper()
-        url = f"https://api.macvendors.com/{clean_mac}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            vendor = response.text.strip()
-            return (
-                f"MAC Address: {clean_mac}\n"
-                f"OUI Prefix: {oui}\n"
-                f"Device Manufacturer: {vendor}\n"
-                f"This device is made by {vendor}. Cross-reference with your IoT asset inventory."
-            )
-        elif response.status_code == 404:
-            return f"MAC {clean_mac} (OUI: {oui}) — Vendor NOT FOUND. Could be a spoofed MAC or unregistered device. Treat as suspicious."
-        return f"MAC lookup failed with status code {response.status_code}."
-    except Exception as e:
-        return f"Error looking up MAC address: {str(e)}"
-
-@tool
-def query_cve_database(cve_id: str) -> str:
-    """Query the NIST National Vulnerability Database for details about a specific CVE. Input MUST be a CVE ID like CVE-2021-44228."""
-    try:
-        cve_id = cve_id.strip().upper()
-        url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id}"
-        headers = {"Accept": "application/json"}
-        response = requests.get(url, headers=headers, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            vulns = data.get("vulnerabilities", [])
-            if not vulns:
-                return f"CVE {cve_id} not found in the NVD database."
-            cve_data = vulns[0].get("cve", {})
-            desc_list = cve_data.get("descriptions", [])
-            description = next((d["value"] for d in desc_list if d["lang"] == "en"), "No description available.")
-            metrics = cve_data.get("metrics", {})
-            cvss_score = "N/A"
-            severity = "N/A"
-            for version_key in ["cvssMetricV31", "cvssMetricV30", "cvssMetricV2"]:
-                if version_key in metrics:
-                    cvss_data = metrics[version_key][0].get("cvssData", {})
-                    cvss_score = cvss_data.get("baseScore", "N/A")
-                    severity = cvss_data.get("baseSeverity", "N/A")
-                    break
-            published = cve_data.get("published", "Unknown")[:10]
-            return (
-                f"CVE ID: {cve_id}\n"
-                f"Published: {published}\n"
-                f"CVSS Score: {cvss_score} ({severity})\n"
-                f"Description: {description[:500]}\n"
-                f"Recommendation: Patch immediately if score >= 7.0. Check vendor advisories for IoT firmware updates."
-            )
-        elif response.status_code == 403:
-            return f"NVD API rate limited. Try again in 30 seconds."
-        return f"NVD API returned status code {response.status_code}."
-    except Exception as e:
-        return f"Error querying CVE database: {str(e)}"
-
-@tool
-def consult_playbook(incident_type: str) -> str:
-    """Use this tool to read the official Incident Response Playbook to see what actions to take. Pass a brief description of the incident as the input."""
-    try:
-        playbook_path = os.path.join(os.path.dirname(__file__), "playbook.env.txt")
-        loader = TextLoader(playbook_path)
-        documents = loader.load()
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        docs = text_splitter.split_documents(documents)
-        
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        db = Chroma.from_documents(docs, embeddings)
-        
-        results = db.similarity_search(incident_type, k=3)
-        if results:
-            combined = "\n---\n".join([r.page_content for r in results])
-            return f"Official Playbook Results:\n{combined}"
-        return "No specific rule found for this incident type."
-    except Exception as e:
-        return f"Error reading playbook: {str(e)}"
 
 
 # ==========================================
