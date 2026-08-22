@@ -65,26 +65,26 @@ section[data-testid="stSidebarUserContent"] {margin-top: 0 !important; padding-t
 }
 
 /* ═══════════ GLOBAL ═══════════ */
-html, body, .stApp, ***REMOVED***data-testid="stAppViewContainer"***REMOVED*** {
+html, body, .stApp, [data-testid="stAppViewContainer"] {
     background-color: var(--bg-primary) !important;
     color: var(--text) !important;
     font-family: var(--font-mono) !important;
 }
 .stApp {background: var(--bg-primary) !important;}
-***REMOVED***data-testid="stAppViewBlockContainer"***REMOVED*** {max-width: 1200px;}
+[data-testid="stAppViewBlockContainer"] {max-width: 1200px;}
 
 /* ═══════════ SIDEBAR ═══════════ */
-section***REMOVED***data-testid="stSidebar"***REMOVED*** {
+section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #070b14 0%, #0c1220 100%) !important;
     border-right: 1px solid var(--border) !important;
 }
-section***REMOVED***data-testid="stSidebar"***REMOVED*** * {
+section[data-testid="stSidebar"] * {
     color: var(--text) !important;
     font-family: var(--font-mono) !important;
 }
-section***REMOVED***data-testid="stSidebar"***REMOVED*** .stMarkdown h1,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** .stMarkdown h2,
-section***REMOVED***data-testid="stSidebar"***REMOVED*** .stMarkdown h3 {
+section[data-testid="stSidebar"] .stMarkdown h1,
+section[data-testid="stSidebar"] .stMarkdown h2,
+section[data-testid="stSidebar"] .stMarkdown h3 {
     color: var(--cyan) !important;
     font-family: var(--font-display) !important;
     letter-spacing: 1px;
@@ -106,60 +106,60 @@ input:focus, textarea:focus, .stTextInput input:focus {
 }
 
 /* ═══════════ CHAT INPUT BAR ═══════════ */
-***REMOVED***data-testid="stChatInput"***REMOVED*** {
+[data-testid="stChatInput"] {
     background-color: var(--bg-secondary) !important;
     border: 1px solid var(--border) !important;
     border-radius: 12px !important;
 }
-***REMOVED***data-testid="stChatInput"***REMOVED***:focus-within {
+[data-testid="stChatInput"]:focus-within {
     border-color: var(--cyan) !important;
     box-shadow: var(--glow-cyan) !important;
 }
-***REMOVED***data-testid="stChatInput"***REMOVED*** textarea {
+[data-testid="stChatInput"] textarea {
     background: transparent !important;
     color: var(--text) !important;
 }
 
 /* ═══════════ CHAT MESSAGES ═══════════ */
-***REMOVED***data-testid="stChatMessage"***REMOVED*** {
+[data-testid="stChatMessage"] {
     background: var(--bg-card) !important;
     border: 1px solid var(--border) !important;
     border-radius: 10px !important;
     padding: 1rem !important;
     margin-bottom: 0.5rem !important;
 }
-***REMOVED***data-testid="stChatMessage"***REMOVED*** p,
-***REMOVED***data-testid="stChatMessage"***REMOVED*** li,
-***REMOVED***data-testid="stChatMessage"***REMOVED*** span {
+[data-testid="stChatMessage"] p,
+[data-testid="stChatMessage"] li,
+[data-testid="stChatMessage"] span {
     color: var(--text) !important;
 }
-***REMOVED***data-testid="stChatMessage"***REMOVED*** strong {color: var(--cyan) !important;}
-***REMOVED***data-testid="stChatMessage"***REMOVED*** code {
+[data-testid="stChatMessage"] strong {color: var(--cyan) !important;}
+[data-testid="stChatMessage"] code {
     background: #0d1321 !important;
     color: var(--green) !important;
     border-radius: 4px; padding: 2px 6px;
 }
 
 /* ═══════════ METRIC CARDS ═══════════ */
-***REMOVED***data-testid="stMetric"***REMOVED*** {
+[data-testid="stMetric"] {
     background: var(--bg-card) !important;
     border: 1px solid var(--border) !important;
     border-radius: 10px !important;
     padding: 0.8rem 1.2rem !important;
     transition: border-color 0.3s;
 }
-***REMOVED***data-testid="stMetric"***REMOVED***:hover {
+[data-testid="stMetric"]:hover {
     border-color: var(--cyan) !important;
     box-shadow: var(--glow-cyan) !important;
 }
-***REMOVED***data-testid="stMetric"***REMOVED*** label {
+[data-testid="stMetric"] label {
     color: var(--text-muted) !important;
     font-family: var(--font-mono) !important;
     text-transform: uppercase;
     font-size: 0.7rem !important;
     letter-spacing: 1.5px;
 }
-***REMOVED***data-testid="stMetric"***REMOVED*** ***REMOVED***data-testid="stMetricValue"***REMOVED*** {
+[data-testid="stMetric"] [data-testid="stMetricValue"] {
     color: var(--cyan) !important;
     font-family: var(--font-display) !important;
     font-weight: 700 !important;
@@ -181,16 +181,16 @@ input:focus, textarea:focus, .stTextInput input:focus {
 }
 
 /* ═══════════ STATUS / SPINNER ═══════════ */
-***REMOVED***data-testid="stStatusWidget"***REMOVED*** {
+[data-testid="stStatusWidget"] {
     background: var(--bg-card) !important;
     border: 1px solid var(--cyan-dim) !important;
     border-radius: 10px !important;
 }
-***REMOVED***data-testid="stStatusWidget"***REMOVED*** summary {color: var(--cyan) !important;}
+[data-testid="stStatusWidget"] summary {color: var(--cyan) !important;}
 .stSpinner > div > span {color: var(--cyan) !important;}
 
 /* ═══════════ ALERTS ═══════════ */
-.stAlert ***REMOVED***data-testid="stAlertContentError"***REMOVED*** {
+.stAlert [data-testid="stAlertContentError"] {
     background: #1a0a12 !important;
     border-color: var(--red) !important;
     color: var(--red) !important;
@@ -310,7 +310,7 @@ else:
 st.markdown(f"""
 <div class="soc-header">
     <div style="display:flex; align-items:center;">
-      ***REMOVED***logo_html}
+      {logo_html}
         <div>
             <h1>CYBERSICKER<span class="badge">SOC ACTIVE</span></h1>
             <div class="subtitle">Autonomous IoT Blue Team Agent &mdash; Threat Detection &amp; Response System</div>
@@ -388,7 +388,7 @@ def check_ip_virustotal(ip_address: str) -> str:
     try:
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
-            stats = response.json()***REMOVED***'data'***REMOVED******REMOVED***'attributes'***REMOVED******REMOVED***'last_analysis_stats'***REMOVED***
+            stats = response.json()['data']['attributes']['last_analysis_stats']
             malicious = stats.get('malicious', 0)
             if malicious > 0:
                 return f"CRITICAL: {malicious} security vendors flagged {ip_address} as malicious!"
@@ -402,7 +402,7 @@ def lookup_mac_address(mac_address: str) -> str:
     """Look up the manufacturer/vendor of a device by its MAC address. Input should be a MAC address like AA:BB:CC:DD:EE:FF."""
     try:
         clean_mac = mac_address.replace('-', ':').strip()
-        oui = clean_mac.replace(':', '')***REMOVED***:6***REMOVED***.upper()
+        oui = clean_mac.replace(':', '')[:6].upper()
         url = f"https://api.macvendors.com/{clean_mac}"
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
@@ -429,27 +429,27 @@ def query_cve_database(cve_id: str) -> str:
         response = requests.get(url, headers=headers, timeout=15)
         if response.status_code == 200:
             data = response.json()
-            vulns = data.get("vulnerabilities", ***REMOVED******REMOVED***)
+            vulns = data.get("vulnerabilities", [])
             if not vulns:
                 return f"CVE {cve_id} not found in the NVD database."
-            cve_data = vulns***REMOVED***0***REMOVED***.get("cve", {})
-            desc_list = cve_data.get("descriptions", ***REMOVED******REMOVED***)
-            description = next((d***REMOVED***"value"***REMOVED*** for d in desc_list if d***REMOVED***"lang"***REMOVED*** == "en"), "No description available.")
+            cve_data = vulns[0].get("cve", {})
+            desc_list = cve_data.get("descriptions", [])
+            description = next((d["value"] for d in desc_list if d["lang"] == "en"), "No description available.")
             metrics = cve_data.get("metrics", {})
             cvss_score = "N/A"
             severity = "N/A"
-            for version_key in ***REMOVED***"cvssMetricV31", "cvssMetricV30", "cvssMetricV2"***REMOVED***:
+            for version_key in ["cvssMetricV31", "cvssMetricV30", "cvssMetricV2"]:
                 if version_key in metrics:
-                    cvss_data = metrics***REMOVED***version_key***REMOVED******REMOVED***0***REMOVED***.get("cvssData", {})
+                    cvss_data = metrics[version_key][0].get("cvssData", {})
                     cvss_score = cvss_data.get("baseScore", "N/A")
                     severity = cvss_data.get("baseSeverity", "N/A")
                     break
-            published = cve_data.get("published", "Unknown")***REMOVED***:10***REMOVED***
+            published = cve_data.get("published", "Unknown")[:10]
             return (
                 f"CVE ID: {cve_id}\n"
                 f"Published: {published}\n"
                 f"CVSS Score: {cvss_score} ({severity})\n"
-                f"Description: {description***REMOVED***:500***REMOVED***}\n"
+                f"Description: {description[:500]}\n"
                 f"Recommendation: Patch immediately if score >= 7.0. Check vendor advisories for IoT firmware updates."
             )
         elif response.status_code == 403:
@@ -473,7 +473,7 @@ def consult_playbook(incident_type: str) -> str:
         
         results = db.similarity_search(incident_type, k=3)
         if results:
-            combined = "\n---\n".join(***REMOVED***r.page_content for r in results***REMOVED***)
+            combined = "\n---\n".join([r.page_content for r in results])
             return f"Official Playbook Results:\n{combined}"
         return "No specific rule found for this incident type."
     except Exception as e:
@@ -596,13 +596,13 @@ with tab4:
 # ==========================================
 # Initialize chat history in Streamlit session
 if "messages" not in st.session_state:
-    st.session_state.messages = ***REMOVED******REMOVED***
+    st.session_state.messages = []
 
 # Display previous messages with custom avatars
 for msg in st.session_state.messages:
-    avatar = "🛡️" if msg***REMOVED***"role"***REMOVED*** == "assistant" else "👤"
-    with st.chat_message(msg***REMOVED***"role"***REMOVED***, avatar=avatar):
-        st.markdown(msg***REMOVED***"content"***REMOVED***)
+    avatar = "🛡️" if msg["role"] == "assistant" else "👤"
+    with st.chat_message(msg["role"], avatar=avatar):
+        st.markdown(msg["content"])
 
 # User Input with Security Validation (Phase 4)
 if prompt := st.chat_input("Enter a command for Cybersicker..."):
@@ -625,7 +625,7 @@ if prompt := st.chat_input("Enter a command for Cybersicker..."):
                 try:
                     status.update(label="🧠 Loading Gemini LLM...", state="running")
                     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, api_key=google_key)
-                    tools = ***REMOVED***network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook***REMOVED***
+                    tools = [network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook]
 
                     status.update(label="⚙️ Constructing Agent Graph...", state="running")
                     agent = create_agent(
@@ -636,12 +636,12 @@ if prompt := st.chat_input("Enter a command for Cybersicker..."):
 
                     status.update(label="📡 Executing Analysis — Tools Running...", state="running")
                     response = agent.invoke({
-                        "messages": ***REMOVED***("user", sanitized_prompt)***REMOVED***
-                  ***REMOVED***)
+                        "messages": [("user", sanitized_prompt)]
+                    })
                     
-                    final_content = response***REMOVED***"messages"***REMOVED******REMOVED***-1***REMOVED***.content
+                    final_content = response["messages"][-1].content
                     if isinstance(final_content, list):
-                        answer = final_content***REMOVED***0***REMOVED******REMOVED***"text"***REMOVED***
+                        answer = final_content[0]["text"]
                     else:
                         answer = final_content
 

@@ -1,16 +1,5 @@
 import type { Metadata } from "next";
-import { Orbitron, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-
-const orbitron = Orbitron({
-  subsets: ***REMOVED***"latin"***REMOVED***,
-  variable: "--font-display",
-});
-
-const jetBrainsMono = JetBrains_Mono({
-  subsets: ***REMOVED***"latin"***REMOVED***,
-  variable: "--font-mono",
-});
 
 export const metadata: Metadata = {
   title: "CYBERSICKER // SOC Dashboard",
@@ -27,11 +16,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${orbitron.variable} ${jetBrainsMono.variable} antialiased min-h-screen`}
+        className="antialiased min-h-screen"
       >
-      ***REMOVED***/* Scan-line overlay */}
+      {/* Scan-line overlay */}
         <div className="scanline-overlay" />
-      ***REMOVED***children}
+      {children}
       </body>
     </html>
   );

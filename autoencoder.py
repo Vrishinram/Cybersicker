@@ -1,56 +1,229 @@
-import pandas as pd
-import numpy as np
+"""
+CYBERSICKER — ML Anomaly Detection Engine
+Deep autoencoder + PCA for IoT network traffic analysis.
+Caches and persists trained model + StandardScaler + PCA for fast inference.
+Supports TensorFlow / Keras with graceful scikit-learn MLP fallback if TensorFlow is absent.
+"""
+
+from __future__ import annotations
+
+import json
 import logging
-from sklearn.preprocessing import StandardScaler
+import os
+from pathlib import Path
+from typing import Any
+
+import joblib
+import numpy as np
+import pandas as pd
 from sklearn.decomposition import PCA
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler
+
+try:
+    import tensorflow as tf
+    from tensorflow.keras.layers import Dense
+    from tensorflow.keras.models import Sequential, load_model
+    HAS_TF = True
+except ImportError:
+    HAS_TF = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Cybersicker.MLDetection")
 
-def run_network_scan(filepath, anomaly_threshold=0.5):
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_DIR = BASE_DIR / "models"
+MODEL_DIR.mkdir(exist_ok=True)
+
+MITRE_MAP = [
+    {"id": "T1595", "name": "Active Scanning", "tactic": "Reconnaissance"},
+    {"id": "T1498", "name": "Network Denial of Service", "tactic": "Impact"},
+    {"id": "T1571", "name": "Non-Standard Port", "tactic": "Command and Control"},
+    {"id": "T1041", "name": "Exfiltration Over C2 Channel", "tactic": "Exfiltration"},
+    {"id": "T1570", "name": "Lateral Tool Transfer", "tactic": "Lateral Movement"},
+    {"id": "T1486", "name": "Data Encrypted for Impact", "tactic": "Impact"},
+]
+
+
+def _load_numeric(filepath: str | Path) -> pd.DataFrame:
+    path = Path(filepath)
+    if not path.is_file():
+        fallback = BASE_DIR / "KDDTrain+.txt"
+        if fallback.is_file() and path.name in ("KDDTrain+.txt", "KDDTrain+.csv"):
+            path = fallback
+        else:
+            raise FileNotFoundError(f"Traffic file not found: {filepath}")
+
+    dataset = pd.read_csv(path, header=None)
+    numeric = dataset.select_dtypes(include=["number"])
+    if numeric.empty:
+        raise ValueError("No numeric columns found to analyze.")
+    return numeric
+
+
+def _build_autoencoder(input_dim: int):
+    if HAS_TF:
+        model = Sequential(
+            [
+                tf.keras.Input(shape=(input_dim,)),
+                Dense(16, activation="relu"),
+                Dense(8, activation="relu"),
+                Dense(16, activation="relu"),
+                Dense(input_dim, activation="linear"),
+            ]
+        )
+        model.compile(optimizer="adam", loss="mse")
+        return model
+    else:
+        # Fallback neural network autoencoder using scikit-learn MLPRegressor
+        return MLPRegressor(
+            hidden_layer_sizes=(16, 8, 16),
+            activation="relu",
+            max_iter=15,
+            random_state=42,
+        )
+
+
+def _severity(anomaly_pct: float) -> dict[str, Any]:
+    if anomaly_pct > 10:
+        return {
+            "level": "CRITICAL",
+            "confidence": "CRITICAL — Multiple attack patterns detected",
+            "verdict": "HIGH RISK",
+        }
+    if anomaly_pct > 5:
+        return {
+            "level": "HIGH",
+            "confidence": "HIGH — Significant anomaly activity",
+            "verdict": "HIGH RISK",
+        }
+    if anomaly_pct > 2:
+        return {
+            "level": "MEDIUM",
+            "confidence": "MEDIUM — Suspicious patterns detected",
+            "verdict": "MODERATE",
+        }
+    return {
+        "level": "LOW",
+        "confidence": "LOW — Normal network behavior",
+        "verdict": "LOW RISK",
+    }
+
+
+def analyze_network_data(
+    filepath: str | Path,
+    anomaly_threshold: float = 0.5,
+    retrain: bool = False,
+) -> dict[str, Any]:
     """
-    Run ML-based anomaly detection on network traffic logs.
-    
-    Cybersecurity Skills:
-    - network-traffic-analysis-fundamentals (Network Security)
-    - feature-engineering-anomaly-ml (Malware Analysis)
-    - dimensionality-reduction-pca (Network Security)
-    - detecting-botnet-traffic-patterns (Threat Hunting)
-    - detecting-ddos-volumetric-attacks (Threat Hunting)
-    - detecting-lateral-movement-in-networks (Threat Hunting)
-    - detecting-ransomware-traffic-signatures (Threat Hunting)
-    
-    MITRE ATT&CK Techniques Detected:
-    - T1566: Phishing (email traffic anomalies)
-    - T1595: Active Scanning (port scan patterns)
-    - T1498: Network Denial of Service (volumetric floods)
-    - T1041: Exfiltration Over C2 (data volume spikes)
-    - T1570: Lateral Tool Transfer (internal propagation)
-    - T1571: Non-Standard Port/Protocol (C2 communication)
-    - T1486: Data Encrypted for Impact (ransomware signatures)
-    
-    NIST CSF Alignment:
-    - DE.CM-01: Monitor network activities
-    - DE.AE-02: Detect anomalies
-    
-    Algorithm: Deep Autoencoder + PCA
-    - Input: Network traffic features (numeric columns)
-    - Preprocessing: StandardScaler + PCA (95% variance retention)
-    - Model: 4-layer autoencoder (Dense layers with ReLU/Linear activation)
-    - Output: MSE-based anomaly scores
-    
-    Args:
-        filepath: Path to network traffic CSV (NSL-KDD format)
-        anomaly_threshold: MSE threshold for flagging anomalies (default 0.5)
-        
-    Returns:
-        Number of anomalous records detected
-    \"\"\"\n    try:\n        # STEP 1: Load Data\n        logger.info(f\"Loading network traffic data from {filepath}\")\n        dataset = pd.read_csv(filepath, header=None)\n        numeric_data = dataset.select_dtypes(include=['number'])\n        \n        if numeric_data.empty:\n            logger.error(\"No numeric columns found for analysis\")\n            return \"Scan Failed: No numeric columns found to analyze.\"\n\n        # STEP 2: Preprocess (Normalize & Dimensionality Reduction)\n        logger.info(f\"Preprocessing {len(numeric_data)} records\")\n        scaler = StandardScaler()\n        scaled_data = scaler.fit_transform(numeric_data)\n        \n        # Apply PCA to retain 95% variance\n        pca = PCA(n_components=0.95)\n        reduced_data = pca.fit_transform(scaled_data)\n        input_dim = reduced_data.shape[1]\n        \n        logger.info(f\"Dimensionality reduced: {numeric_data.shape[1]} → {input_dim} features\")\n\n        # STEP 3: Build & Train Autoencoder\n        logger.info(\"Building 4-layer autoencoder for anomaly detection\")\n        model = Sequential([\n            tf.keras.Input(shape=(input_dim,)),\n            Dense(16, activation='relu'),   # Encoder layer 1\n            Dense(8, activation='relu'),    # Encoder layer 2 (bottleneck)\n            Dense(16, activation='relu'),   # Decoder layer 1\n            Dense(input_dim, activation='linear')  # Decoder output\n        ])\n        model.compile(optimizer='adam', loss='mse')\n        \n        # Train silently (no verbose output)\n        logger.info(\"Training encoder (5 epochs, batch_size=256)\")\n        model.fit(reduced_data, reduced_data, epochs=5, batch_size=256, verbose=0)\n\n        # STEP 4: Detect Anomalies\n        logger.info(\"Running inference and computing reconstruction error\")\n        reconstructions = model.predict(reduced_data, verbose=0)\n        mse = np.mean(np.power(reduced_data - reconstructions, 2), axis=1)\n        \n        # Count anomalies above threshold\n        num_anomalies = np.sum(mse > anomaly_threshold)\n        \n        # Compute statistics for reporting\n        mean_mse = np.mean(mse)\n        max_mse = np.max(mse)\n        percentile_95 = np.percentile(mse, 95)\n        \n        logger.info(f\"Anomaly Detection Complete:\")\n        logger.info(f\"  Total records analyzed: {len(reduced_data)}\")\n        logger.info(f\"  Anomalies detected: {num_anomalies}\")\n        logger.info(f\"  Mean MSE: {mean_mse:.4f}\")\n        logger.info(f\"  Max MSE: {max_mse:.4f}\")\n        logger.info(f\"  95th percentile MSE: {percentile_95:.4f}\")\n        logger.info(f\"  Anomaly rate: {(num_anomalies/len(reduced_data)*100):.2f}%\")\n        \n        # MITRE ATT&CK Confidence Score\n        anomaly_percentage = (num_anomalies/len(reduced_data)*100)\n        if anomaly_percentage > 10:\n            confidence = \"CRITICAL - Multiple attack patterns detected\"\n        elif anomaly_percentage > 5:\n            confidence = \"HIGH - Significant anomaly activity\"\n        elif anomaly_percentage > 2:\n            confidence = \"MEDIUM - Suspicious patterns detected\"\n        else:\n            confidence = \"LOW - Normal network behavior\"\n        \n        logger.info(f\"  MITRE ATT&CK Detection Confidence: {confidence}\")\n        logger.info(f\"  NIST CSF Alignment: DE.CM-01 (Continuous monitoring)\")\n\n        return int(num_anomalies)\n\n    except Exception as e:\n        logger.error(f\"Scan Error: {str(e)}\", exc_info=True)\n        return f\"Scan Error: {str(e)}\"
+    Run ML-based anomaly detection using deep autoencoder and PCA.
+    Persists and reloads model, scaler, and PCA artifacts in `models/`.
+    """
+    path = Path(filepath)
+    if not path.is_file():
+        fallback = BASE_DIR / "KDDTrain+.txt"
+        if fallback.is_file() and path.name in ("KDDTrain+.txt", "KDDTrain+.csv"):
+            path = fallback
+        else:
+            raise FileNotFoundError(f"Traffic file not found: {filepath}")
+
+    numeric_data = _load_numeric(path)
+    total = len(numeric_data)
+
+    model_path = MODEL_DIR / ("autoencoder.keras" if HAS_TF else "autoencoder_mlp.joblib")
+    scaler_path = MODEL_DIR / "scaler.joblib"
+    pca_path = MODEL_DIR / "pca.joblib"
+    meta_path = MODEL_DIR / "metadata.json"
+
+    if (
+        not retrain
+        and model_path.exists()
+        and scaler_path.exists()
+        and pca_path.exists()
+    ):
+        logger.info("Loading persisted autoencoder, scaler, and PCA from %s", MODEL_DIR)
+        model = load_model(model_path) if HAS_TF else joblib.load(model_path)
+        scaler: StandardScaler = joblib.load(scaler_path)
+        pca: PCA = joblib.load(pca_path)
+        scaled = scaler.transform(numeric_data)
+        reduced = pca.transform(scaled)
+        input_dim = reduced.shape[1]
+        trained = False
+    else:
+        logger.info("Fitting scaler, PCA, and training autoencoder...")
+        scaler = StandardScaler()
+        scaled = scaler.fit_transform(numeric_data)
+        pca = PCA(n_components=0.95)
+        reduced = pca.fit_transform(scaled)
+        input_dim = reduced.shape[1]
+
+        model = _build_autoencoder(input_dim)
+        if HAS_TF:
+            model.fit(reduced, reduced, epochs=5, batch_size=256, verbose=0)
+            model.save(model_path)
+        else:
+            model.fit(reduced, reduced)
+            joblib.dump(model, model_path)
+
+        joblib.dump(scaler, scaler_path)
+        joblib.dump(pca, pca_path)
+        meta_path.write_text(
+            json.dumps({"input_dim": input_dim, "total_trained_samples": total, "backend": "tensorflow" if HAS_TF else "sklearn"}),
+            encoding="utf-8",
+        )
+        trained = True
+        logger.info("Saved autoencoder model + preprocessors to %s", MODEL_DIR)
+
+    if HAS_TF:
+        reconstructions = model.predict(reduced, verbose=0)
+    else:
+        reconstructions = model.predict(reduced)
+
+    mse = np.mean(np.power(reduced - reconstructions, 2), axis=1)
+    anomaly_mask = mse > anomaly_threshold
+    num_anomalies = int(np.sum(anomaly_mask))
+    anomaly_pct = (num_anomalies / total * 100) if total else 0.0
+    sev = _severity(anomaly_pct)
+
+    top_idx = np.argsort(mse)[-min(10, total):][::-1].tolist()
+    top_scores = [round(float(mse[i]), 4) for i in top_idx]
+
+    report = {
+        "event": "SCAN_COMPLETE",
+        "filepath": str(path),
+        "anomalies_detected": num_anomalies,
+        "total_records": total,
+        "anomaly_percentage": round(anomaly_pct, 2),
+        "threshold": anomaly_threshold,
+        "model": "Autoencoder (16→8→16) + PCA (0.95)" if HAS_TF else "MLP Autoencoder (16→8→16) + PCA (0.95)",
+        "features_in": int(numeric_data.shape[1]),
+        "features_pca": int(input_dim),
+        "mean_mse": round(float(np.mean(mse)), 4),
+        "max_mse": round(float(np.max(mse)), 4),
+        "p95_mse": round(float(np.percentile(mse, 95)), 4),
+        "top_anomaly_rows": top_idx,
+        "top_anomaly_scores": top_scores,
+        "mitre_attack": MITRE_MAP,
+        "nist_csf": ["DE.CM-01", "DE.AE-02"],
+        "severity": sev["level"],
+        "confidence": sev["confidence"],
+        "verdict": sev["verdict"],
+        "cached_model": not trained,
+    }
+    return report
+
+
+def run_network_scan(filepath: str | Path, anomaly_threshold: float = 0.5, retrain: bool = False):
+    """Backward-compatible wrapper — returns anomaly count or error string."""
+    try:
+        report = analyze_network_data(filepath, anomaly_threshold=anomaly_threshold, retrain=retrain)
+        return int(report["anomalies_detected"])
+    except Exception as e:
+        logger.error("Scan Error: %s", e, exc_info=True)
+        return f"Scan Error: {e}"
+
 
 if __name__ == "__main__":
-    # Test it one last time
-    path = r"C:\Users\91638\Desktop\KDDTrain+.csv\KDDTrain+.txt" 
-    print(f"Agent Observation: Found {run_network_scan(path)} anomalies.")
+    default = BASE_DIR / "KDDTrain+.txt"
+    target = str(default) if default.is_file() else "KDDTrain+.txt"
+    print(json.dumps(analyze_network_data(target), indent=2))

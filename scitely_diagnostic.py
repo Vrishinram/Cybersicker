@@ -10,12 +10,12 @@ def test_api(url, model, key):
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json"
-  ***REMOVED***
+    }
     payload = {
         "model": model,
-        "messages": ***REMOVED***{"role": "user", "content": "hi"}***REMOVED***,
+        "messages": [{"role": "user", "content": "hi"}],
         "stream": False
-  ***REMOVED***
+    }
     try:
         resp = requests.post(f"{url}/chat/completions", headers=headers, json=payload, timeout=15)
         print(f"Status Code: {resp.status_code}")
@@ -28,8 +28,8 @@ def test_api(url, model, key):
 
 if __name__ == "__main__":
     key = os.environ.get("SCITELY_API_KEY")
-    base_urls = ***REMOVED***"https://api.scitely.ai/v1", "https://api.scitely.com/v1"***REMOVED***
-    models = ***REMOVED***"qwen3-32b", "qwen3-coder-plus", "gpt-4o-mini"***REMOVED***
+    base_urls = ["https://api.scitely.ai/v1", "https://api.scitely.com/v1"]
+    models = ["qwen3-32b", "qwen3-coder-plus", "gpt-4o-mini"]
     
     for url in base_urls:
         for model in models:

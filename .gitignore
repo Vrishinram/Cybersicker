@@ -1,11 +1,14 @@
-# Environment variables
+# Environment variables & Secrets
 .env
 .env.local
 .env.*.local
+*.env
+!playbook.env.txt
+!.env.example
 
-# Python
+# Python & Caches
 __pycache__/
-*.py***REMOVED***cod***REMOVED***
+*.py[cod]
 *$py.class
 *.so
 .Python
@@ -27,20 +30,33 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
-# OS
-Thumbs.db
+# Logs & Debugging
+*.log
+debug-*.log
+
+# Models & Large Artefacts
+models/
+.model_cache/
+*.keras
+*.h5
+*.joblib
+
+# IDE & Editor Folders
+.vscode/
+.idea/
+.claude/
+.cursor/
+*.swp
+*.swo
+*~
 .DS_Store
+Thumbs.db
+
+# Frontend build artefacts
+frontend/.next/
+frontend/out/
+frontend/node_modules/

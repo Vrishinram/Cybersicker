@@ -15,18 +15,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
-import pandas as pd
-import numpy as np
 
 # ─── App Setup ───────────────────────────────────────────────
 app = FastAPI(title="CYBERSICKER API", version="2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=***REMOVED***"*"***REMOVED***,
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=***REMOVED***"*"***REMOVED***,
-    allow_headers=***REMOVED***"*"***REMOVED***,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ─── Load env keys ───────────────────────────────────────────
@@ -53,7 +51,7 @@ def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
         "message": message,
         "data": data,
         "timestamp": int(__import__("time").time() * 1000),
-  ***REMOVED***
+    }
     # region agent log
     try:
         with DEBUG_LOG_PATH.open("a", encoding="utf-8") as f:
@@ -80,7 +78,7 @@ class PlaybookRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    history: list = ***REMOVED******REMOVED***
+    history: list = []
 
 class ToolResponse(BaseModel):
     success: bool
@@ -116,7 +114,7 @@ async def network_scan(req: ScanRequest):
                     "threshold": 0.5,
                     "model": "Autoencoder (16→8→16)",
                     "verdict": verdict
-              ***REMOVED***)
+                })
             )
         
         from autoencoder import run_network_scan
@@ -131,7 +129,7 @@ async def network_scan(req: ScanRequest):
                     "threshold": 0.5,
                     "model": "Autoencoder (16→8→16)",
                     "verdict": "HIGH RISK" if result > 1000 else "MODERATE" if result > 100 else "LOW RISK"
-              ***REMOVED***)
+                })
             )
         return ToolResponse(success=False, result=str(result))
     except Exception as e:
@@ -153,24 +151,24 @@ async def check_ip(req: IPRequest):
             "8.8.8.8": {"malicious": 0, "suspicious": 0, "harmless": 100, "verdict": "CLEAN", "note": "Google Public DNS"},
             "127.0.0.1": {"malicious": 0, "suspicious": 0, "harmless": 1, "verdict": "CLEAN", "note": "Local Loopback"},
             "192.168.1.100": {"malicious": 0, "suspicious": 0, "harmless": 5, "verdict": "CLEAN", "note": "Internal Network"},
-      ***REMOVED***
+        }
         data = mock_threats.get(req.ip_address, {
             "malicious": 0, "suspicious": 0, "harmless": 10, "verdict": "CLEAN"
-      ***REMOVED***)
+        })
         return ToolResponse(
             success=True,
             result=json.dumps({
                 "event": "VT_LOOKUP (SIMULATED)",
                 "ip": req.ip_address,
                 **data
-          ***REMOVED***)
+            })
         )
     try:
         url = f"https://www.virustotal.com/api/v3/ip_addresses/{req.ip_address}"
         headers = {"accept": "application/json", "x-apikey": VT_API_KEY}
         response = requests.get(url, headers=headers, timeout=15)
         if response.status_code == 200:
-            stats = response.json()***REMOVED***'data'***REMOVED******REMOVED***'attributes'***REMOVED******REMOVED***'last_analysis_stats'***REMOVED***
+            stats = response.json()['data']['attributes']['last_analysis_stats']
             malicious = stats.get('malicious', 0)
             suspicious = stats.get('suspicious', 0)
             harmless = stats.get('harmless', 0)
@@ -183,7 +181,7 @@ async def check_ip(req: IPRequest):
                     "suspicious": suspicious,
                     "harmless": harmless,
                     "verdict": "MALICIOUS" if malicious > 0 else "CLEAN"
-              ***REMOVED***)
+                })
             )
         return ToolResponse(success=False, result=f"VirusTotal API returned status {response.status_code}")
     except Exception as e:
@@ -199,15 +197,15 @@ async def mac_lookup(req: MACRequest):
         # Normalization to handle dots/hyphens/colons
         clean_mac = req.mac_address.replace('-', ':').replace('.', '').strip()
         if '.' in req.mac_address and len(req.mac_address) >= 14: # Cisco style
-             clean_mac = ':'.join(***REMOVED***req.mac_address.replace('.', '')***REMOVED***i:i+2***REMOVED*** for i in range(0, 12, 2)***REMOVED***)
+             clean_mac = ':'.join([req.mac_address.replace('.', '')[i:i+2] for i in range(0, 12, 2)])
         
-        oui = clean_mac.replace(':', '')***REMOVED***:6***REMOVED***.upper()
+        oui = clean_mac.replace(':', '')[:6].upper()
         
         # ── Simulation Guard ──
         mock_vendors = {
             "001A2B": "Cisco Systems, Inc.",
             "001A2B3C4D5E": "Cisco Systems, Inc.",
-      ***REMOVED***
+        }
         vendor = mock_vendors.get(oui, None)
         if vendor:
              return ToolResponse(
@@ -218,7 +216,7 @@ async def mac_lookup(req: MACRequest):
                     "oui": oui,
                     "vendor": vendor,
                     "note": f"Verified {vendor} device. Format detected correctly."
-              ***REMOVED***)
+                })
             )
 
         url = f"https://api.macvendors.com/{clean_mac}"
@@ -233,7 +231,7 @@ async def mac_lookup(req: MACRequest):
                     "oui": oui,
                     "vendor": vendor,
                     "note": f"Device manufactured by {vendor}. Cross-reference with IoT asset inventory."
-              ***REMOVED***)
+                })
             )
         elif response.status_code == 404:
             return ToolResponse(
@@ -244,7 +242,7 @@ async def mac_lookup(req: MACRequest):
                     "oui": oui,
                     "vendor": "NOT FOUND",
                     "note": "Vendor not found. Could be a spoofed MAC or unregistered device. Treat as suspicious."
-              ***REMOVED***)
+                })
             )
         return ToolResponse(success=False, result=f"MAC lookup failed with status {response.status_code}")
     except Exception as e:
@@ -264,47 +262,47 @@ async def cve_lookup(req: CVERequest):
                 "published": "2021-12-10", "cvss_score": 10.0, "severity": "CRITICAL",
                 "description": "Apache Log4j2 remote code execution vulnerability (Log4Shell).",
                 "recommendation": "Upgrade to Log4j 2.17.1 or higher immediately."
-          ***REMOVED***,
+            },
             "CVE-2017-0144": {
                 "published": "2017-03-14", "cvss_score": 8.1, "severity": "HIGH",
                 "description": "SMBv1 vulnerability used by EternalBlue and WannaCry.",
                 "recommendation": "Apply MS17-010 security update."
-          ***REMOVED***,
+            },
             "CVE-2023-23397": {
                 "published": "2023-03-14", "cvss_score": 9.8, "severity": "CRITICAL",
                 "description": "Microsoft Outlook Elevation of Privilege Vulnerability.",
                 "recommendation": "Apply latest Microsoft Outlook patches."
-          ***REMOVED***
-      ***REMOVED***
+            }
+        }
         if cve_id in mock_cves:
              return ToolResponse(success=True, result=json.dumps({
                 "event": "CVE_LOOKUP (SIMULATED)", "cve_id": cve_id, "found": True,
-                **mock_cves***REMOVED***cve_id***REMOVED***
-          ***REMOVED***))
+                **mock_cves[cve_id]
+          }))
 
         url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id}"
         response = requests.get(url, headers={"Accept": "application/json"}, timeout=15)
         if response.status_code == 200:
             data = response.json()
-            vulns = data.get("vulnerabilities", ***REMOVED******REMOVED***)
+            vulns = data.get("vulnerabilities", [])
             if not vulns:
                 return ToolResponse(success=True, result=json.dumps({
                     "event": "CVE_LOOKUP", "cve_id": cve_id, "found": False,
                     "note": f"{cve_id} not found in NVD database."
-              ***REMOVED***))
-            cve_data = vulns***REMOVED***0***REMOVED***.get("cve", {})
-            desc_list = cve_data.get("descriptions", ***REMOVED******REMOVED***)
-            description = next((d***REMOVED***"value"***REMOVED*** for d in desc_list if d***REMOVED***"lang"***REMOVED*** == "en"), "No description available.")
+              }))
+            cve_data = vulns[0].get("cve", {})
+            desc_list = cve_data.get("descriptions", [])
+            description = next((d["value"] for d in desc_list if d["lang"] == "en"), "No description available.")
             metrics = cve_data.get("metrics", {})
             cvss_score = "N/A"
             severity = "N/A"
-            for vk in ***REMOVED***"cvssMetricV31", "cvssMetricV30", "cvssMetricV2"***REMOVED***:
+            for vk in ["cvssMetricV31", "cvssMetricV30", "cvssMetricV2"]:
                 if vk in metrics:
-                    cvss_data = metrics***REMOVED***vk***REMOVED******REMOVED***0***REMOVED***.get("cvssData", {})
+                    cvss_data = metrics[vk][0].get("cvssData", {})
                     cvss_score = cvss_data.get("baseScore", "N/A")
                     severity = cvss_data.get("baseSeverity", "N/A")
                     break
-            published = cve_data.get("published", "Unknown")***REMOVED***:10***REMOVED***
+            published = cve_data.get("published", "Unknown")[:10]
             return ToolResponse(
                 success=True,
                 result=json.dumps({
@@ -314,9 +312,9 @@ async def cve_lookup(req: CVERequest):
                     "published": published,
                     "cvss_score": cvss_score,
                     "severity": severity,
-                    "description": description***REMOVED***:500***REMOVED***,
+                    "description": description[:500],
                     "recommendation": "Patch immediately if score >= 7.0. Check vendor advisories for IoT firmware updates."
-              ***REMOVED***)
+                })
             )
         elif response.status_code == 403:
             return ToolResponse(success=False, result="NVD API rate limited. Try again in 30 seconds.")
@@ -347,7 +345,7 @@ async def consult_playbook(req: PlaybookRequest):
 
         results = db.similarity_search(req.incident_type, k=3)
         if results:
-            combined = "\n---\n".join(***REMOVED***r.page_content for r in results***REMOVED***)
+            combined = "\n---\n".join([r.page_content for r in results])
             return ToolResponse(
                 success=True,
                 result=json.dumps({
@@ -355,12 +353,12 @@ async def consult_playbook(req: PlaybookRequest):
                     "query": req.incident_type,
                     "matches": len(results),
                     "content": combined
-              ***REMOVED***)
+                })
             )
         return ToolResponse(success=True, result=json.dumps({
             "event": "PLAYBOOK_MATCH", "query": req.incident_type,
             "matches": 0, "content": "No specific rule found for this incident type."
-      ***REMOVED***))
+      }))
     except Exception as e:
         return ToolResponse(success=False, result=f"Error: {str(e)}")
 
@@ -377,7 +375,7 @@ async def agent_chat(req: ChatRequest):
         "groq_key_set": bool(GROQ_API_KEY),
         "openrouter_key_set": bool(OPENROUTER_API_KEY),
         "scitely_key_set": bool(SCITELY_API_KEY),
-  ***REMOVED***)
+    })
     if not GOOGLE_API_KEY and not GROQ_API_KEY and not OPENROUTER_API_KEY and not SCITELY_API_KEY:
         debug_log("B1", "api.py:agent_chat:sandbox", "No keys found, entering Sandbox Mode", {})
         return {
@@ -389,7 +387,7 @@ async def agent_chat(req: ChatRequest):
                 "- **Required:** Add a `GOOGLE_API_KEY` or `SCITELY_API_KEY` to `.env` for full autonomous power.\n\n"
                 "How can I assist your SOC operations today?"
             ),
-      ***REMOVED***
+        }
     try:
         from langchain.tools import tool
         from autoencoder import run_network_scan as _run_scan
@@ -411,7 +409,7 @@ async def agent_chat(req: ChatRequest):
                 headers = {"accept": "application/json", "x-apikey": VT_API_KEY}
                 resp = requests.get(url, headers=headers, timeout=15)
                 if resp.status_code == 200:
-                    stats = resp.json()***REMOVED***'data'***REMOVED******REMOVED***'attributes'***REMOVED******REMOVED***'last_analysis_stats'***REMOVED***
+                    stats = resp.json()['data']['attributes']['last_analysis_stats']
                     mal = stats.get('malicious', 0)
                     return f"CRITICAL: {mal} vendors flagged {ip_address} as malicious!" if mal > 0 else f"CLEAN: 0 vendors flagged {ip_address}."
                 return f"API error {resp.status_code}"
@@ -433,12 +431,12 @@ async def agent_chat(req: ChatRequest):
             try:
                 resp = requests.get(f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id.strip().upper()}", timeout=15)
                 if resp.status_code == 200:
-                    vulns = resp.json().get("vulnerabilities", ***REMOVED******REMOVED***)
+                    vulns = resp.json().get("vulnerabilities", [])
                     if not vulns:
                         return f"{cve_id} not found."
-                    cve = vulns***REMOVED***0***REMOVED******REMOVED***"cve"***REMOVED***
-                    desc = next((d***REMOVED***"value"***REMOVED*** for d in cve.get("descriptions", ***REMOVED******REMOVED***) if d***REMOVED***"lang"***REMOVED*** == "en"), "No description.")
-                    return f"CVE: {cve_id}\nDescription: {desc***REMOVED***:400***REMOVED***}"
+                    cve = vulns[0]["cve"]
+                    desc = next((d["value"] for d in cve.get("descriptions", []) if d["lang"] == "en"), "No description.")
+                    return f"CVE: {cve_id}\nDescription: {desc[:400]}"
                 return f"API error {resp.status_code}"
             except Exception as e:
                 return f"Error: {str(e)}"
@@ -455,7 +453,7 @@ async def agent_chat(req: ChatRequest):
                 docs = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100).split_documents(loader.load())
                 db = Chroma.from_documents(docs, HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"))
                 results = db.similarity_search(incident_type, k=3)
-                return "\n---\n".join(***REMOVED***r.page_content for r in results***REMOVED***) if results else "No match found."
+                return "\n---\n".join([r.page_content for r in results]) if results else "No match found."
             except Exception as e:
                 return f"Error: {str(e)}"
 
@@ -490,28 +488,28 @@ async def agent_chat(req: ChatRequest):
 
         debug_log("B4", "api.py:agent_chat:provider", "Selected chat provider", {
             "provider": provider
-      ***REMOVED***)
+        })
 
         if llm is None:
             raise RuntimeError("No valid chat provider configured.")
 
         # LangChain Agents usually require a prompt template. 
         # We'll use a more direct approach if create_agent is missing or failing.
-        tools = ***REMOVED***network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook_tool***REMOVED***
+        tools = [network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook_tool]
         
         try:
             # Try standard tool calling if supported by the LLM
             llm_with_tools = llm.bind_tools(tools)
             
             # Simple manual agent loop for maximum compatibility
-            messages = ***REMOVED***
+            messages = [
                 ("system", (
                     "You are Cybersicker, an elite cybersecurity SOC agent designed by Vrishin Ram K. "
                     "You analyze IoT network threats using your tools. Always format responses neatly with markdown. "
                     "Use bold for key findings, code blocks for IPs/hashes, and bullet points for structured data."
                 )),
                 ("user", req.message)
-            ***REMOVED***
+            ]
             
             ai_msg = llm_with_tools.invoke(messages)
             
@@ -519,10 +517,10 @@ async def agent_chat(req: ChatRequest):
             tool_map = {tool.name: tool for tool in tools}
             if ai_msg.tool_calls:
                 for tool_call in ai_msg.tool_calls:
-                    selected_tool = tool_map***REMOVED***tool_call***REMOVED***"name"***REMOVED***.lower().replace("-", "_")***REMOVED***
-                    tool_output = selected_tool.invoke(tool_call***REMOVED***"args"***REMOVED***)
+                    selected_tool = tool_map[tool_call["name"].lower().replace("-", "_")]
+                    tool_output = selected_tool.invoke(tool_call["args"])
                     messages.append(ai_msg)
-                    messages.append(("tool", tool_output, tool_call***REMOVED***"id"***REMOVED***))
+                    messages.append(("tool", tool_output, tool_call["id"]))
                 
                 # Final response after tool calls
                 final_response = llm_with_tools.invoke(messages)
@@ -533,7 +531,7 @@ async def agent_chat(req: ChatRequest):
         except Exception as tool_err:
             # If tool calling fails (e.g. Scitely formatting error), fallback to direct chat
             debug_log("B5", "api.py:agent_chat:tool_fallback", f"Tool calling failed: {str(tool_err)}", {})
-            response = llm.invoke(***REMOVED***("user", req.message)***REMOVED***)
+            response = llm.invoke([("user", req.message)])
             answer = response.content
 
         return {"success": True, "response": answer}
@@ -541,8 +539,8 @@ async def agent_chat(req: ChatRequest):
     except Exception as e:
         debug_log("B2", "api.py:agent_chat:exception", "Agent execution failed", {
             "error_type": type(e).__name__,
-            "error": str(e)***REMOVED***:300***REMOVED***,
-      ***REMOVED***)
+            "error": str(e)[:300],
+        })
         traceback.print_exc()
         
         # Fallback to Mock Agent (Sandbox Mode) if LLM provider fails
@@ -560,6 +558,29 @@ async def agent_chat(req: ChatRequest):
                     "- **Severity:** MONITORING\n"
                     "- **Recommendation:** No critical threats found, but proceed with caution."
                 )
+            elif "who are you" in msg or "your name" in msg or "introduce" in msg or "purpose" in msg:
+                response = (
+                    "🤖 **Agent Profile**\n\n"
+                    "I am **Cybersicker**, an elite AI-powered cybersecurity SOC agent designed by **Vrishin Ram K**.\n\n"
+                    "My mission is to autonomously detect, investigate, and mitigate network threats in IoT environments by orchestrating threat intelligence and machine learning tools."
+                )
+            elif "what tools" in msg or "available tools" in msg or "capabilities" in msg or "what can you do" in msg or "tool list" in msg or "agent tools" in msg:
+                response = (
+                    "🛠️ **Agent Capabilities**\n\n"
+                    "I have 5 autonomous security tools at my disposal:\n"
+                    "1. 🔎 **Network Scanner**: Deep neural network autoencoder anomaly scan on logs.\n"
+                    "2. 🛡️ **IP Check**: Threat intelligence lookup via VirusTotal API.\n"
+                    "3. 🌐 **MAC Lookup**: Resolves device manufacturer from MAC OUI.\n"
+                    "4. 🐛 **CVE Database**: NIST NVD vulnerability database query.\n"
+                    "5. 📚 **Consult Playbook**: RAG-based ChromaDB query for incident response procedures.\n\n"
+                    "*(Note: You can trigger these tools dynamically by clicking them in the 'Agent Tools' panel on the left!)*"
+                )
+            elif "hi" in msg or "hello" in msg or "hey" in msg or "help" in msg:
+                response = (
+                    "🛡️ **Welcome to Cybersicker SOC**\n\n"
+                    "Hello! I am **Cybersicker**, your autonomous SOC analyst. How can I assist with your threat intelligence or anomaly detection operations today?\n\n"
+                    "You can ask me to run tools (e.g. *\"Scan KDDTrain+.txt\"* or *\"Check IP 185.220.101.43\"*) or query general threat concepts."
+                )
             elif "ip" in msg or "." in msg:
                 response = (
                     "🚨 **Cybersicker Sandbox Alert**\n\n"
@@ -567,6 +588,31 @@ async def agent_chat(req: ChatRequest):
                     "- **Verdict:** SUSPICIOUS\n"
                     "- **Detection Ratio:** 4/72\n"
                     "- **Note:** This IP has been associated with low-level scanning activity in Sandbox mode."
+                )
+            elif "mac" in msg or "device" in msg or "manufacturer" in msg or "oui" in msg:
+                response = (
+                    "🌐 **Cybersicker Sandbox MAC Resolver**\n\n"
+                    "I've simulated a MAC lookup:\n"
+                    "- **OUI Vendor:** ASUS Tek Computer Inc.\n"
+                    "- **Verdict:** AUTHORIZED IoT device.\n"
+                    "- **Note:** Manufacturer recognized. Reference device inventory for asset verification."
+                )
+            elif "cve" in msg or "vuln" in msg or "database" in msg or "nist" in msg or "nvd" in msg:
+                response = (
+                    "🐛 **Cybersicker Sandbox CVE Query**\n\n"
+                    "I've simulated a CVE database search:\n"
+                    "- **Target Vulnerability:** CVE-2017-0144 (EternalBlue)\n"
+                    "- **CVSS Score:** 8.1 (HIGH)\n"
+                    "- **Description:** Remote Code Execution vulnerability in Microsoft SMBv1.\n"
+                    "- **Recommendation:** Block port 445 immediately and apply MS17-010 security update."
+                )
+            elif "playbook" in msg or "incident" in msg or "response" in msg or "mitigation" in msg:
+                response = (
+                    "📚 **Cybersicker Sandbox Playbook Consult**\n\n"
+                    "I've queried the ChromaDB playbook database:\n"
+                    "- **Incident Type:** Ransomware Containment\n"
+                    "- **Containment Phase:** Isolate host from VLAN, block outbound port 445 and 139, disable SMBv1.\n"
+                    "- **Recovery Phase:** Verify backup integrity and perform bare-metal restore."
                 )
             else:
                 response = (
@@ -590,7 +636,7 @@ async def health():
         "openrouter_key_set": bool(OPENROUTER_API_KEY),
         "scitely_key_set": bool(SCITELY_API_KEY),
         "vt_key_set": bool(VT_API_KEY),
-  ***REMOVED***
+    }
 
 
 if __name__ == "__main__":

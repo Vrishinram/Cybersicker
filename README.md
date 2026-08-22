@@ -248,13 +248,13 @@ A deep neural network trained on normal network traffic:
 ```
 Input Layer (n features via PCA)
     ↓
-Dense(16, ReLU)  ***REMOVED***Encoder 1***REMOVED***
+Dense(16, ReLU)  [Encoder 1]
     ↓
-Dense(8, ReLU)   ***REMOVED***Bottleneck***REMOVED***
+Dense(8, ReLU)   [Bottleneck]
     ↓
-Dense(16, ReLU)  ***REMOVED***Decoder 1***REMOVED***
+Dense(16, ReLU)  [Decoder 1]
     ↓
-Dense(n, Linear) ***REMOVED***Output***REMOVED***
+Dense(n, Linear) [Output]
 ```
 
 **Training Pipeline:**
@@ -396,14 +396,14 @@ Contributions are welcome! Please:
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see ***REMOVED***LICENSE***REMOVED***(LICENSE) file for details.
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 👤 Author
 
 **Vrishin Ram.K**  
-📧 ***REMOVED***Contact***REMOVED***(mailto:vrishinram.k@dsu.edu.in)
+📧 [Contact](mailto:vrishinram.k@dsu.edu.in)
 
 ---
 

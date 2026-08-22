@@ -25,7 +25,7 @@ The system simulates a **blue-team SOC analyst** — it can scan network traffic
 | **Anomaly Detection ML** | TensorFlow/Keras Autoencoder + Scikit-Learn (PCA, StandardScaler) |
 | **Playbook RAG** | LangChain `TextLoader` → `CharacterTextSplitter` → `HuggingFaceEmbeddings` → `ChromaDB` |
 | **Threat Intelligence** | VirusTotal API, NIST NVD API, macvendors.com API |
-| **Dataset** | KDD Cup 1999 (NSL-KDD) — ***REMOVED***KDDTrain+.txt***REMOVED***(file:///d:/CYBERSICKER/KDDTrain+.txt) |
+| **Dataset** | KDD Cup 1999 (NSL-KDD) — [KDDTrain+.txt](file:///d:/CYBERSICKER/KDDTrain+.txt) |
 
 ---
 
@@ -33,23 +33,23 @@ The system simulates a **blue-team SOC analyst** — it can scan network traffic
 
 ```mermaid
 graph TD
-    A***REMOVED***"👤 User Input<br/>(Chat or CLI)"***REMOVED*** --> B***REMOVED***"🤖 Gemini 2.5 Flash Agent<br/>(LangChain)"***REMOVED***
-    B --> C***REMOVED***"🔍 Network Scanner<br/>(autoencoder.py)"***REMOVED***
-    B --> D***REMOVED***"🌐 VirusTotal<br/>IP Reputation Check"***REMOVED***
-    B --> E***REMOVED***"📋 Playbook RAG<br/>(ChromaDB)"***REMOVED***
-    B --> F***REMOVED***"🔎 CVE Lookup<br/>(NIST NVD API)"***REMOVED***
-    B --> G***REMOVED***"📡 MAC Lookup<br/>(macvendors.com)"***REMOVED***
-    C --> H***REMOVED***"TensorFlow Autoencoder<br/>+ PCA + StandardScaler"***REMOVED***
-    H --> I***REMOVED***"KDDTrain+.txt<br/>(NSL-KDD Dataset)"***REMOVED***
-    E --> J***REMOVED***"playbook.env.txt<br/>(IR Playbook v2.0)"***REMOVED***
-    B --> K***REMOVED***"📊 Streamlit Dashboard<br/>or CLI Output"***REMOVED***
+    A["👤 User Input<br/>(Chat or CLI)"] --> B["🤖 Gemini 2.5 Flash Agent<br/>(LangChain)"]
+    B --> C["🔍 Network Scanner<br/>(autoencoder.py)"]
+    B --> D["🌐 VirusTotal<br/>IP Reputation Check"]
+    B --> E["📋 Playbook RAG<br/>(ChromaDB)"]
+    B --> F["🔎 CVE Lookup<br/>(NIST NVD API)"]
+    B --> G["📡 MAC Lookup<br/>(macvendors.com)"]
+    C --> H["TensorFlow Autoencoder<br/>+ PCA + StandardScaler"]
+    H --> I["KDDTrain+.txt<br/>(NSL-KDD Dataset)"]
+    E --> J["playbook.env.txt<br/>(IR Playbook v2.0)"]
+    B --> K["📊 Streamlit Dashboard<br/>or CLI Output"]
 ```
 
 ---
 
 ## File-by-File Breakdown
 
-### 1. ***REMOVED***app.py***REMOVED***(file:///d:/CYBERSICKER/app.py) — Streamlit SOC Dashboard (542 lines)
+### 1. [app.py](file:///d:/CYBERSICKER/app.py) — Streamlit SOC Dashboard (542 lines)
 
 The **primary user interface** — a full-featured web dashboard with a cybersecurity aesthetic.
 
@@ -73,11 +73,11 @@ The **primary user interface** — a full-featured web dashboard with a cybersec
 
 ---
 
-### 2. ***REMOVED***agent.py***REMOVED***(file:///d:/CYBERSICKER/agent.py) — CLI Terminal Agent (121 lines)
+### 2. [agent.py](file:///d:/CYBERSICKER/agent.py) — CLI Terminal Agent (121 lines)
 
 A **command-line version** of the agent for direct terminal interaction.
 
-**Key differences from ***REMOVED***app.py***REMOVED***(file:///d:/CYBERSICKER/app.py):**
+**Key differences from [app.py](file:///d:/CYBERSICKER/app.py):**
 - Loads API keys from `.env` file with fallback to `getpass` prompt
 - Has 3 tools (scanner, VirusTotal, playbook) vs. 5 in the dashboard
 - Runs in an interactive `while True` loop
@@ -85,7 +85,7 @@ A **command-line version** of the agent for direct terminal interaction.
 
 ---
 
-### 3. ***REMOVED***autoencoder.py***REMOVED***(file:///d:/CYBERSICKER/autoencoder.py) — ML Anomaly Detection Engine (49 lines)
+### 3. [autoencoder.py](file:///d:/CYBERSICKER/autoencoder.py) — ML Anomaly Detection Engine (49 lines)
 
 The **core ML component** — a Deep Autoencoder for network traffic anomaly detection.
 
@@ -115,13 +115,13 @@ CSV Data → Numeric Column Extraction → StandardScaler → PCA (95% variance)
 
 ---
 
-### 4. ***REMOVED***cyber_test.py***REMOVED***(file:///d:/CYBERSICKER/cyber_test.py) — Gemini API Test Script (14 lines)
+### 4. [cyber_test.py](file:///d:/CYBERSICKER/cyber_test.py) — Gemini API Test Script (14 lines)
 
 A simple **test/demo script** that sends a cybersecurity-related prompt to Google Gemini to verify API connectivity.
 
 ---
 
-### 5. ***REMOVED***playbook.env.txt***REMOVED***(file:///d:/CYBERSICKER/playbook.env.txt) — Incident Response Playbook (380 lines)
+### 5. [playbook.env.txt](file:///d:/CYBERSICKER/playbook.env.txt) — Incident Response Playbook (380 lines)
 
 A comprehensive **IoT Incident Response & Threat Detection Playbook** aligned with **NIST CSF 2.0** and **MITRE ATT&CK for ICS/IoT**.
 
@@ -146,11 +146,11 @@ The LLM agent has access to **5 tools** (in the dashboard; 3 in CLI):
 
 | # | Tool | API Used | Purpose |
 |---|---|---|---|
-| 1 | ***REMOVED***network_scanner***REMOVED***(file:///d:/CYBERSICKER/app.py#371-379) | Local (autoencoder.py) | Scans CSV/TXT traffic logs using the autoencoder to count anomalies |
-| 2 | ***REMOVED***check_ip_virustotal***REMOVED***(file:///d:/CYBERSICKER/agent.py#44-62) | VirusTotal v3 API | Checks if an IP is flagged as malicious by security vendors |
-| 3 | ***REMOVED***lookup_mac_address***REMOVED***(file:///d:/CYBERSICKER/app.py#401-422) | macvendors.com | Identifies device manufacturer from MAC address (OUI lookup) |
-| 4 | ***REMOVED***query_cve_database***REMOVED***(file:///d:/CYBERSICKER/app.py#423-461) | NIST NVD v2.0 API | Retrieves CVE details including CVSS score and severity |
-| 5 | ***REMOVED***consult_playbook***REMOVED***(file:///d:/CYBERSICKER/agent.py#63-82) | Local (ChromaDB RAG) | Semantic search over the IR playbook using embeddings |
+| 1 | [network_scanner](file:///d:/CYBERSICKER/app.py#371-379) | Local (autoencoder.py) | Scans CSV/TXT traffic logs using the autoencoder to count anomalies |
+| 2 | [check_ip_virustotal](file:///d:/CYBERSICKER/agent.py#44-62) | VirusTotal v3 API | Checks if an IP is flagged as malicious by security vendors |
+| 3 | [lookup_mac_address](file:///d:/CYBERSICKER/app.py#401-422) | macvendors.com | Identifies device manufacturer from MAC address (OUI lookup) |
+| 4 | [query_cve_database](file:///d:/CYBERSICKER/app.py#423-461) | NIST NVD v2.0 API | Retrieves CVE details including CVSS score and severity |
+| 5 | [consult_playbook](file:///d:/CYBERSICKER/agent.py#63-82) | Local (ChromaDB RAG) | Semantic search over the IR playbook using embeddings |
 
 ---
 
@@ -167,7 +167,7 @@ The LLM agent has access to **5 tools** (in the dashboard; 3 in CLI):
 
 ## Dataset — KDDTrain+.txt
 
-The project uses the **NSL-KDD** dataset (***REMOVED***KDDTrain+.txt***REMOVED***(file:///d:/CYBERSICKER/KDDTrain+.txt), ~19 MB), a refined version of the KDD Cup 1999 dataset. It contains labeled network connections with features like:
+The project uses the **NSL-KDD** dataset ([KDDTrain+.txt](file:///d:/CYBERSICKER/KDDTrain+.txt), ~19 MB), a refined version of the KDD Cup 1999 dataset. It contains labeled network connections with features like:
 
 - Duration, protocol type, service, flag
 - Source/destination bytes

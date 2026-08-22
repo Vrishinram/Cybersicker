@@ -5,51 +5,51 @@ import { AlertModal } from "@/components/cyber/alert-modal";
 import { LogPanel } from "@/components/cyber/log-panel";
 import { ScanButton } from "@/components/cyber/scan-button";
 
-const SAMPLE_LOGS = ***REMOVED***
-***REMOVED*** timestamp: "11:27:18", level: "info" as const, message: "Agent Kestrel mapped subnet 10.20.18.0/24." },
-***REMOVED*** timestamp: "11:27:20", level: "warn" as const, message: "Anomaly score 0.72 on host NODE-14." },
-***REMOVED*** timestamp: "11:27:23", level: "critical" as const, message: "Credential exfil pattern on SRV-12 detected." },
-***REMOVED***;
+const SAMPLE_LOGS = [
+  { timestamp: "11:27:18", level: "info" as const, message: "Agent Kestrel mapped subnet 10.20.18.0/24." },
+  { timestamp: "11:27:20", level: "warn" as const, message: "Anomaly score 0.72 on host NODE-14." },
+  { timestamp: "11:27:23", level: "critical" as const, message: "Credential exfil pattern on SRV-12 detected." }
+];
 
 export default function DesignSystemPage() {
-  const ***REMOVED***scanActive, setScanActive***REMOVED*** = useState(true);
-  const ***REMOVED***alertOpen, setAlertOpen***REMOVED*** = useState(false);
+  const [scanActive, setScanActive] = useState(true);
+  const [alertOpen, setAlertOpen] = useState(false);
 
-  const statusLabel = useMemo(() => (scanActive ? "Agent swarm hunting threats" : "Agent swarm paused"), ***REMOVED***scanActive***REMOVED***);
+  const statusLabel = useMemo(() => (scanActive ? "Agent swarm hunting threats" : "Agent swarm paused"), [scanActive]);
 
   return (
-    <main className="min-h-screen bg-***REMOVED***#06080d***REMOVED*** bg-cyber-grid px-4 py-8 text-slate-100 md:px-8">
+    <main className="min-h-screen bg-[#06080d] bg-cyber-grid px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="cyber-panel px-5 py-5 md:px-7">
-          <p className="font-mono text-xs uppercase tracking-***REMOVED***0.2em***REMOVED*** text-cyan-200">Cybersicker UI Foundation</p>
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-200">Cybersicker UI Foundation</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-50">Premium cyberpunk design starter</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
             This route demonstrates reusable Tailwind patterns for agent activity controls, real-time scanning logs, and critical alert overlays.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <ScanButton active={scanActive} onClick={() => setScanActive((current) => !current)}>
-            ***REMOVED***scanActive ? "Pause Scan" : "Resume Scan"}
+            {scanActive ? "Pause Scan" : "Resume Scan"}
             </ScanButton>
             <ScanButton onClick={() => setAlertOpen(true)}>Trigger Alert Modal</ScanButton>
             <span className="rounded-full border border-cyan-300/25 bg-cyan-500/10 px-3 py-1 font-mono text-xs text-cyan-100">
-            ***REMOVED***statusLabel}
+            {statusLabel}
             </span>
           </div>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-***REMOVED***1.1fr_0.9fr***REMOVED***">
+        <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <LogPanel title="Active Scanning Stream" logs={SAMPLE_LOGS} />
           <div className="cyber-panel p-5">
-            <p className="font-mono text-xs uppercase tracking-***REMOVED***0.2em***REMOVED*** text-cyan-200">Palette tokens</p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-200">Palette tokens</p>
             <div className="mt-4 grid grid-cols-2 gap-3 text-xs md:grid-cols-3">
-            ***REMOVED******REMOVED***
-                ***REMOVED***"Base 0", "#06080D", "bg-***REMOVED***#06080D***REMOVED***"***REMOVED***,
-                ***REMOVED***"Base 1", "#0B1020", "bg-***REMOVED***#0B1020***REMOVED***"***REMOVED***,
-                ***REMOVED***"Accent Green", "#00FF9D", "bg-***REMOVED***#00FF9D***REMOVED***"***REMOVED***,
-                ***REMOVED***"Accent Cyan", "#00D1FF", "bg-***REMOVED***#00D1FF***REMOVED***"***REMOVED***,
-                ***REMOVED***"Danger", "#FF3B5C", "bg-***REMOVED***#FF3B5C***REMOVED***"***REMOVED***,
-                ***REMOVED***"Warning", "#FFB020", "bg-***REMOVED***#FFB020***REMOVED***"***REMOVED***,
-              ***REMOVED***.map((***REMOVED***name, value, bgClass***REMOVED***) => (
+            {[
+                ["Base 0", "#06080D", "bg-[#06080D]"],
+                ["Base 1", "#0B1020", "bg-[#0B1020]"],
+                ["Accent Green", "#00FF9D", "bg-[#00FF9D]"],
+                ["Accent Cyan", "#00D1FF", "bg-[#00D1FF]"],
+                ["Danger", "#FF3B5C", "bg-[#FF3B5C]"],
+                ["Warning", "#FFB020", "bg-[#FFB020]"],
+              ].map(([name, value, bgClass]) => (
                 <div key={name} className="rounded-lg border border-slate-700 p-2">
                   <div className={`h-8 rounded ${bgClass}`} />
                   <p className="mt-2 text-slate-200">{name}</p>
