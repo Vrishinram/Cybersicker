@@ -16,3 +16,7 @@ scikit-learn
 sentence-transformers
 chromadb
 watchfiles
+pyjwt
+pytest
+pytest-asyncio
+pytest-cov
