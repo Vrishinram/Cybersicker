@@ -15,3 +15,4 @@ __all__ = [
     "normalize_mac",
     "IEEE_OUI_DATABASE"
 ]
+

@@ -193,3 +193,4 @@ class ChromaPlaybookRAG:
 
 # Global singleton instance
 playbook_rag = ChromaPlaybookRAG()
+

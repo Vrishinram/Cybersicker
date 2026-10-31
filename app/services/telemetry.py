@@ -51,3 +51,4 @@ class TelemetryBroadcaster:
 
 # Global singleton instance
 telemetry_service = TelemetryBroadcaster()
+

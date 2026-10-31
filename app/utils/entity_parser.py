@@ -361,3 +361,4 @@ def parse_and_validate_entities(prompt: str) -> ParsedEntities:
         playbook_query=playbook_query,
         telemetry_event=telemetry
     )
+
