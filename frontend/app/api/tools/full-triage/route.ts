@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveMacOui } from "../../oui";
 
 export async function POST(req: Request) {
   const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8000";
@@ -17,6 +18,9 @@ export async function POST(req: Request) {
   } catch {
     // Cloud fallback
   }
+
+  const rawMac = body.mac_address || "00:1A:2B:3C:4D:5E";
+  const resolvedMac = resolveMacOui(rawMac);
 
   return NextResponse.json({
     success: true,
@@ -42,10 +46,11 @@ export async function POST(req: Request) {
       },
       mac: {
         event: "MAC_RESOLVE",
-        mac: body.mac_address || "00:1A:2B:3C:4D:5E",
-        oui: "001A2B",
-        vendor: "Cisco Systems, Inc.",
-        note: "Verified Cisco Systems, Inc. device. Format detected correctly.",
+        mac: resolvedMac.mac,
+        oui: resolvedMac.oui,
+        vendor: resolvedMac.vendor,
+        note: resolvedMac.deviceNote,
+        category: resolvedMac.category,
       },
       cve: {
         event: "CVE_LOOKUP",

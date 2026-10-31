@@ -197,62 +197,139 @@ async def check_ip(req: IPRequest):
 
 
 # ═══════════════════════════════════════════════════════════════
-# TOOL 3: MAC Address Lookup
+# TOOL 3: MAC Address Lookup & IEEE OUI Resolution
 # ═══════════════════════════════════════════════════════════════
+OUI_REGISTRY = {
+    # Raspberry Pi Foundation (IoT SBC)
+    "B827EB": {"vendor": "Raspberry Pi Foundation", "note": "Identified low-cost IoT single-board computer; inspect unauthorized local network presence.", "category": "IoT SBC"},
+    "DCA632": {"vendor": "Raspberry Pi Foundation", "note": "Identified low-cost IoT single-board computer; inspect unauthorized local network presence.", "category": "IoT SBC"},
+    "E45F01": {"vendor": "Raspberry Pi Foundation", "note": "Identified low-cost IoT single-board computer; inspect unauthorized local network presence.", "category": "IoT SBC"},
+    "28CDC1": {"vendor": "Raspberry Pi Foundation", "note": "Identified low-cost IoT single-board computer; inspect unauthorized local network presence.", "category": "IoT SBC"},
+
+    # Espressif Systems (ESP8266 / ESP32 IoT Microcontroller)
+    "FC65DE": {"vendor": "Espressif Inc.", "note": "Identified low-power ESP32/ESP8266 IoT microcontroller; check for insecure MQTT/CoAP or exposed sensor firmware.", "category": "IoT Microcontroller"},
+    "240AC4": {"vendor": "Espressif Inc.", "note": "Identified low-power ESP32/ESP8266 IoT microcontroller; check for insecure MQTT/CoAP or exposed sensor firmware.", "category": "IoT Microcontroller"},
+    "30AEA4": {"vendor": "Espressif Inc.", "note": "Identified low-power ESP32/ESP8266 IoT microcontroller; check for insecure MQTT/CoAP or exposed sensor firmware.", "category": "IoT Microcontroller"},
+    "A4CF12": {"vendor": "Espressif Inc.", "note": "Identified low-power ESP32/ESP8266 IoT microcontroller; check for insecure MQTT/CoAP or exposed sensor firmware.", "category": "IoT Microcontroller"},
+    "84F3EB": {"vendor": "Espressif Inc.", "note": "Identified low-power ESP32/ESP8266 IoT microcontroller; check for insecure MQTT/CoAP or exposed sensor firmware.", "category": "IoT Microcontroller"},
+
+    # Google LLC (Smart Device / Nest)
+    "001A11": {"vendor": "Google, LLC", "note": "Identified smart home/Nest or Google hardware endpoint; inspect IoT perimeter isolation rules.", "category": "Smart Device / Nest"},
+    "F4F5D8": {"vendor": "Google, LLC", "note": "Identified smart home/Nest or Google hardware endpoint; inspect IoT perimeter isolation rules.", "category": "Smart Device / Nest"},
+    "D86C63": {"vendor": "Google, LLC", "note": "Identified smart home/Nest or Google hardware endpoint; inspect IoT perimeter isolation rules.", "category": "Smart Device / Nest"},
+
+    # VMware Inc. (Virtual Machine Interface)
+    "000C29": {"vendor": "VMware, Inc.", "note": "Identified VMware ESXi/Workstation virtual network adapter; confirm virtualization host legitimacy.", "category": "Virtualization Interface"},
+    "005056": {"vendor": "VMware, Inc.", "note": "Identified VMware ESXi/Workstation virtual network adapter; confirm virtualization host legitimacy.", "category": "Virtualization Interface"},
+    "000569": {"vendor": "VMware, Inc.", "note": "Identified VMware ESXi/Workstation virtual network adapter; confirm virtualization host legitimacy.", "category": "Virtualization Interface"},
+
+    # Parallels Inc. (Virtual Machine Interface)
+    "001C42": {"vendor": "Parallels, Inc.", "note": "Identified Parallels desktop virtualization guest adapter.", "category": "Virtualization Interface"},
+
+    # Microsoft Corporation (Virtual Adapter)
+    "00155D": {"vendor": "Microsoft Corporation", "note": "Identified Microsoft Hyper-V virtual network interface or Windows endpoint.", "category": "Virtualization Interface"},
+
+    # Cisco Systems Inc. (Enterprise Gateway)
+    "001A2B": {"vendor": "Cisco Systems, Inc.", "note": "Verified enterprise switch, router, or core network infrastructure gateway.", "category": "Enterprise Gateway"},
+    "00000C": {"vendor": "Cisco Systems, Inc.", "note": "Verified enterprise switch, router, or core network infrastructure gateway.", "category": "Enterprise Gateway"},
+    "000142": {"vendor": "Cisco Systems, Inc.", "note": "Verified enterprise switch, router, or core network infrastructure gateway.", "category": "Enterprise Gateway"},
+    "000143": {"vendor": "Cisco Systems, Inc.", "note": "Verified enterprise switch, router, or core network infrastructure gateway.", "category": "Enterprise Gateway"},
+
+    # Apple Inc.
+    "3C5AB4": {"vendor": "Apple, Inc.", "note": "Identified Apple macOS/iOS endpoint; verify corporate MDM profile.", "category": "Workstation / Mobile"},
+    "ACBC32": {"vendor": "Apple, Inc.", "note": "Identified Apple macOS/iOS endpoint; verify corporate MDM profile.", "category": "Workstation / Mobile"},
+    "F8FFC2": {"vendor": "Apple, Inc.", "note": "Identified Apple macOS/iOS endpoint; verify corporate MDM profile.", "category": "Workstation / Mobile"},
+
+    # Intel
+    "001E67": {"vendor": "Intel Corporate", "note": "Verified Intel gigabit ethernet/Wi-Fi adapter.", "category": "Enterprise NIC"},
+
+    # TP-Link
+    "50C7BF": {"vendor": "TP-Link Corporation", "note": "Identified TP-Link smart home Wi-Fi smart plug/switch.", "category": "Consumer IoT"},
+}
+
+def resolve_mac_oui(mac_address: str) -> dict:
+    clean = re.sub(r'[^0-9A-Fa-f]', '', mac_address).upper()
+    if len(clean) < 6:
+        return {
+            "mac": mac_address,
+            "oui": clean,
+            "vendor": "INVALID_MAC",
+            "device_note": "Invalid MAC address format (fewer than 6 hex digits).",
+            "category": "Invalid"
+        }
+    oui = clean[:6]
+    formatted_mac = ":".join(clean[i:i+2] for i in range(0, min(12, len(clean)), 2))
+
+    # 1. Match local comprehensive registry
+    if oui in OUI_REGISTRY:
+        entry = OUI_REGISTRY[oui]
+        return {
+            "mac": formatted_mac,
+            "oui": oui,
+            "vendor": entry["vendor"],
+            "device_note": entry["note"],
+            "category": entry["category"]
+        }
+
+    # 2. Check for Locally Administered Address (bit 1 of first byte) or private test MAC
+    first_byte = int(oui[:2], 16)
+    if (first_byte & 0x02) != 0 or oui == "AABBCC":
+        return {
+            "mac": formatted_mac,
+            "oui": oui,
+            "vendor": "Locally Administered / Private Unregistered MAC",
+            "device_note": "Locally administered address (LAA) or randomized/spoofed MAC; treat as high-risk untrusted endpoint.",
+            "category": "Randomized / Spoofed"
+        }
+
+    # 3. Fallback to external public API if reachable
+    try:
+        url = f"https://api.macvendors.com/{formatted_mac}"
+        response = requests.get(url, timeout=3)
+        if response.status_code == 200:
+            vendor = response.text.strip()
+            return {
+                "mac": formatted_mac,
+                "oui": oui,
+                "vendor": vendor,
+                "device_note": f"Device manufactured by {vendor}. Cross-reference with IoT asset inventory.",
+                "category": "Commercial Vendor"
+            }
+        elif response.status_code == 404:
+            return {
+                "mac": formatted_mac,
+                "oui": oui,
+                "vendor": "NOT FOUND",
+                "device_note": "Vendor not found in IEEE database. Could be a spoofed MAC or unregistered device. Treat as suspicious.",
+                "category": "Unregistered"
+            }
+    except Exception:
+        pass
+
+    return {
+        "mac": formatted_mac,
+        "oui": oui,
+        "vendor": "Unknown Manufacturer",
+        "device_note": "Unregistered or obscure hardware vendor; monitor connection telemetry for abnormal egress traffic.",
+        "category": "Unregistered"
+    }
+
+
 @app.post("/api/tools/mac-lookup", response_model=ToolResponse)
 async def mac_lookup(req: MACRequest):
     try:
-        # Normalization to handle dots/hyphens/colons
-        clean_mac = req.mac_address.replace('-', ':').replace('.', '').strip()
-        if '.' in req.mac_address and len(req.mac_address) >= 14: # Cisco style
-             clean_mac = ':'.join([req.mac_address.replace('.', '')[i:i+2] for i in range(0, 12, 2)])
-        
-        oui = clean_mac.replace(':', '')[:6].upper()
-        
-        # ── Simulation Guard ──
-        mock_vendors = {
-            "001A2B": "Cisco Systems, Inc.",
-            "001A2B3C4D5E": "Cisco Systems, Inc.",
-        }
-        vendor = mock_vendors.get(oui, None)
-        if vendor:
-             return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "MAC_RESOLVE (SIMULATED)",
-                    "mac": req.mac_address,
-                    "oui": oui,
-                    "vendor": vendor,
-                    "note": f"Verified {vendor} device. Format detected correctly."
-                })
-            )
-
-        url = f"https://api.macvendors.com/{clean_mac}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            vendor = response.text.strip()
-            return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "MAC_RESOLVE",
-                    "mac": clean_mac,
-                    "oui": oui,
-                    "vendor": vendor,
-                    "note": f"Device manufactured by {vendor}. Cross-reference with IoT asset inventory."
-                })
-            )
-        elif response.status_code == 404:
-            return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "MAC_RESOLVE",
-                    "mac": clean_mac,
-                    "oui": oui,
-                    "vendor": "NOT FOUND",
-                    "note": "Vendor not found. Could be a spoofed MAC or unregistered device. Treat as suspicious."
-                })
-            )
-        return ToolResponse(success=False, result=f"MAC lookup failed with status {response.status_code}")
+        resolved = resolve_mac_oui(req.mac_address)
+        return ToolResponse(
+            success=True,
+            result=json.dumps({
+                "event": "MAC_RESOLVE",
+                "mac": resolved["mac"],
+                "oui": resolved["oui"],
+                "vendor": resolved["vendor"],
+                "note": resolved["device_note"],
+                "category": resolved["category"]
+            })
+        )
     except Exception as e:
         return ToolResponse(success=False, result=f"Error: {str(e)}")
 

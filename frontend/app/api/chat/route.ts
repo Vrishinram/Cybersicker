@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveMacOui } from "../oui";
 
 const IPV4_REGEX = /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g;
 const CVE_REGEX = /CVE-\d{4}-\d{4,7}/gi;
@@ -39,7 +40,8 @@ export async function POST(req: Request) {
   if (wantsAll) {
     const ip = extractedIps[0] || "185.220.101.43";
     const cve = extractedCves[0] || "CVE-2021-44228";
-    const mac = extractedMacs[0] || "00:1A:2B:3C:4D:5E";
+    const rawMac = extractedMacs[0] || "00:1A:2B:3C:4D:5E";
+    const resolvedMac = resolveMacOui(rawMac);
 
     return NextResponse.json({
       success: true,
@@ -69,9 +71,9 @@ export async function POST(req: Request) {
 - **Vendor Remediation:** ${cve === "CVE-2024-3094" ? "Immediately downgrade xz-utils to version 5.4.x and revoke SSH keys." : "Upgrade to Log4j 2.17.1 or higher immediately."}
 
 #### 4. Hardware Identity & Device Profiling (IEEE OUI)
-- **Interface MAC:** \`${mac}\`
-- **Manufacturer / Vendor:** **Cisco Systems, Inc.** (OUI: \`${mac.replace(/[-:]/g, "").slice(0, 6).toUpperCase()}\`)
-- **Asset Assessment:** Verified Cisco Systems, Inc. device.
+- **Interface MAC:** \`${resolvedMac.mac}\`
+- **Manufacturer / Vendor:** **${resolvedMac.vendor}** (OUI: \`${resolvedMac.oui}\`)
+- **Asset Assessment:** ${resolvedMac.deviceNote}
 
 #### 5. Incident Response Playbook Containment Steps (RAG)
 - **Trigger Scenario:** Botnet infection containment and perimeter isolation
@@ -155,17 +157,17 @@ SOP-001: IoT Botnet Infection Response
     }
   }
 
-  // 4. MAC
+  // 4. MAC (Hardware OUI Resolution)
   if (wantsMac) {
     const macsToCheck = extractedMacs.length > 0 ? extractedMacs : ["00:1A:2B:3C:4D:5E"];
     for (const mac of macsToCheck) {
-      const oui = mac.replace(/[-:]/g, "").slice(0, 6).toUpperCase();
+      const resolved = resolveMacOui(mac);
       sections.push(`### [HARDWARE LOOKUP] IEEE MAC OUI Registration
 
-- **MAC Address:** \`${mac}\`
-- **OUI Prefix:** \`${oui}\`
-- **Registered Vendor:** **Cisco Systems, Inc.**
-- **Device Type Note:** Verified Cisco Systems enterprise IoT gateway. Cross-reference with CMDB.`);
+- **MAC Address:** \`${resolved.mac}\`
+- **OUI Prefix:** \`${resolved.oui}\`
+- **Registered Vendor:** **${resolved.vendor}**
+- **Device Type Note:** ${resolved.deviceNote}`);
     }
   }
 
@@ -196,7 +198,7 @@ SOP-001: IoT Threat Containment
     response: `### [SOC AGENT RESPONSE] Operational Guidance
 
 I am **Cybersicker**, your autonomous Blue-Team SOC analyst.
-- To analyze targets, provide custom entities: e.g., \`Analyze IP 8.8.8.8 and query CVE-2024-3094\`
+- To analyze targets, provide custom entities: e.g., \`Resolve MAC B8:27:EB:AA:BB:CC\` or \`Analyze IP 8.8.8.8 and query CVE-2024-3094\`
 - To run all tools simultaneously, click **Run Full-Spectrum Pipeline** in the left deck.
 - All intelligence reports link directly with MITRE ATT&CK and NIST CSF 2.0 response protocols.`,
   });

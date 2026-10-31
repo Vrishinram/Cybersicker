@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveMacOui } from "../../oui";
 
 export async function POST(req: Request) {
   const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8000";
@@ -19,17 +20,17 @@ export async function POST(req: Request) {
   }
 
   const rawMac = body.mac_address || "00:1A:2B:3C:4D:5E";
-  const cleanMac = rawMac.replace(/[-.]/g, ":").toUpperCase();
-  const oui = cleanMac.replace(/:/g, "").slice(0, 6);
+  const resolved = resolveMacOui(rawMac);
 
   return NextResponse.json({
     success: true,
     result: JSON.stringify({
       event: "MAC_RESOLVE",
-      mac: rawMac,
-      oui,
-      vendor: "Cisco Systems, Inc.",
-      note: "Verified Cisco Systems enterprise IoT gateway. Cross-reference with CMDB.",
+      mac: resolved.mac,
+      oui: resolved.oui,
+      vendor: resolved.vendor,
+      note: resolved.deviceNote,
+      category: resolved.category,
     }),
   });
 }
