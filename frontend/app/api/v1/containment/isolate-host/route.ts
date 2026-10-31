@@ -36,3 +36,4 @@ export async function POST(req: Request) {
     audit_note: `Host ${hostIp} isolated. Active sockets severed and lateral propagation prevented.`
   });
 }
+

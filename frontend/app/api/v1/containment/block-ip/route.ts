@@ -33,3 +33,4 @@ export async function POST(req: Request) {
     audit_note: `Traffic with ${ip} blackholed at perimeter boundary.`
   });
 }
+
