@@ -21,14 +21,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Service Imports
+# Service & Router Imports
 from app.services.virustotal import virustotal_service
 from app.services.nvd import nvd_service
 from app.services.oui import oui_service
 from app.services.playbook_rag import playbook_rag_service
 from app.services.traffic_scanner import traffic_scanner_service
 from app.services.telemetry import telemetry_service
-from app.routers.agent import router as agent_router
+from app.routers import agent_router, ingest_router, telemetry_router, containment_router
 
 logger = logging.getLogger("Cybersicker.API")
 
@@ -278,9 +278,12 @@ async def full_triage(req: FullTriageRequest):
 
 
 # ═══════════════════════════════════════════════════════════════
-# MOUNT PRODUCTION AGENT ROUTER
+# MOUNT PRODUCTION ROUTERS
 # ═══════════════════════════════════════════════════════════════
+app.include_router(ingest_router)
 app.include_router(agent_router)
+app.include_router(telemetry_router)
+app.include_router(containment_router)
 
 
 # ─── Health Check ────────────────────────────────────────────
