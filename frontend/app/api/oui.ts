@@ -203,3 +203,4 @@ export function resolveMacOui(macAddress: string) {
     category: "Unregistered",
   };
 }
+
