@@ -40,20 +40,27 @@ export function parseThreatIndicators(text: string) {
     text.includes("Playbook") ||
     text.includes("SOP-") ||
     text.includes("Full-Spectrum") ||
-    text.includes("TRAFFIC CAPTURE ANALYSIS");
+    text.includes("TRAFFIC CAPTURE") ||
+    text.includes("ANOMALY DETECTION");
 
   // Determine security verdict from response content
   let verdict: "MALICIOUS" | "SUSPICIOUS" | "CLEAN" | "UNKNOWN" = "UNKNOWN";
   const upper = text.toUpperCase();
 
-  if (
+  // Known clean public recursive resolvers or explicitly clean text
+  const isExplicitlyClean =
     upper.includes("SECURITY VERDICT:** **CLEAN") ||
     upper.includes("[VERIFIED CLEAN]") ||
     upper.includes("VERDICT: CLEAN") ||
     upper.includes("VERDICT:** **CLEAN") ||
     upper.includes("0 / 72 ENGINES") ||
-    upper.includes("0 / 72 SECURITY")
-  ) {
+    upper.includes("0 / 72 SECURITY") ||
+    upper.includes("CLEAN PUBLIC DNS") ||
+    (threatIp === "8.8.8.8" && !upper.includes("MALICIOUS")) ||
+    (threatIp === "1.1.1.1" && !upper.includes("MALICIOUS")) ||
+    (threatIp === "9.9.9.9" && !upper.includes("MALICIOUS"));
+
+  if (isExplicitlyClean) {
     verdict = "CLEAN";
   } else if (
     upper.includes("MALICIOUS") ||
@@ -87,7 +94,7 @@ export default function ChatFeed({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, chatLoading]);
 
-  // Handle Copy Containment Rule with 2000ms active feedback
+  // Requirement 1: Copy Containment Rule with "Copied!" green feedback for 2000ms
   const handleCopyContainmentRule = async (ip: string) => {
     const rule = `iptables -A INPUT -s ${ip} -j DROP`;
     try {
@@ -98,13 +105,11 @@ export default function ChatFeed({
         setCopiedRuleIp(null);
       }, 2000);
     } catch {
-      // Fallback
       setCopiedRuleIp(ip);
       setTimeout(() => setCopiedRuleIp(null), 2000);
     }
   };
 
-  // Handle message text copy
   const handleCopyText = async (text: string, index: number) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -115,7 +120,7 @@ export default function ChatFeed({
     }
   };
 
-  // Neutral action: Inspect ASN / WHOIS
+  // Requirement 1: Neutral action [Inspect ASN / WHOIS] for CLEAN hosts
   const handleInspectAsnWhois = (ip: string) => {
     onLogEvent?.("info", JSON.stringify({ event: "ASN_WHOIS_LOOKUP", target_ip: ip, registry: "BGP.HE.NET / ARIN" }));
     if (typeof window !== "undefined") {
@@ -241,7 +246,7 @@ export default function ChatFeed({
                 {msg.role === "ai" && (
                   <button
                     onClick={() => handleCopyText(msg.content, i)}
-                    className="hover:text-[var(--text-high)] transition-colors p-0.5"
+                    className="hover:text-[var(--text-high)] transition-colors p-0.5 cursor-pointer"
                     title="Copy report"
                   >
                     {copiedIndex === i ? (
@@ -263,20 +268,20 @@ export default function ChatFeed({
                 {/* Actionable Response Controls (Active Defense Buttons) */}
                 {msg.role === "ai" && (threatIp || threatCve || isDossier) && (
                   <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-2 text-xs font-mono">
-                    {/* Conditional IP Controls */}
+                    {/* Requirement 1: Conditional IP Controls based on verdict */}
                     {threatIp && (
                       <>
-                        {/* Only render containment actions if MALICIOUS or SUSPICIOUS */}
+                        {/* If MALICIOUS or SUSPICIOUS -> render containment actions */}
                         {verdict === "MALICIOUS" || verdict === "SUSPICIOUS" ? (
                           <>
                             <button
                               onClick={() => handleCopyContainmentRule(threatIp)}
-                              className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem]"
+                              className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer"
                             >
                               {copiedRuleIp === threatIp ? (
                                 <>
                                   <Check className="w-3 h-3 text-[#00ff9d]" />
-                                  <span className="text-[#00ff9d] font-semibold">Copied to Clipboard!</span>
+                                  <span className="text-[#00ff9d] font-semibold">Copied!</span>
                                 </>
                               ) : (
                                 <>
@@ -289,9 +294,9 @@ export default function ChatFeed({
                             <button
                               onClick={() => onBlockIp(threatIp)}
                               disabled={blockedIps.has(threatIp)}
-                              className={`px-2.5 py-1 rounded border flex items-center gap-1.5 transition-all text-[0.7rem] ${
+                              className={`px-2.5 py-1 rounded border flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer ${
                                 blockedIps.has(threatIp)
-                                  ? "bg-[var(--status-danger-bg)] border-[var(--status-danger-bd)] text-[var(--status-danger)]"
+                                  ? "bg-[var(--status-danger-bg)] border-[var(--status-danger-bd)] text-[var(--status-danger)] cursor-not-allowed"
                                   : "bg-[var(--status-danger-bg)]/40 border-[var(--status-danger-bd)]/60 text-[var(--status-danger)] hover:bg-[var(--status-danger-bg)] hover:border-[var(--status-danger-bd)]"
                               }`}
                             >
@@ -309,10 +314,10 @@ export default function ChatFeed({
                             </button>
                           </>
                         ) : (
-                          /* For verdict === 'CLEAN', replace with neutral action: [Inspect ASN / WHOIS] */
+                          /* If verdict === 'CLEAN' (e.g. 8.8.8.8) -> DO NOT render containment buttons, render neutral [Inspect ASN / WHOIS] */
                           <button
                             onClick={() => handleInspectAsnWhois(threatIp)}
-                            className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/20 hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem]"
+                            className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/20 hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer"
                           >
                             <Globe className="w-3 h-3 text-[var(--accent-light)]" />
                             <span>Inspect ASN / WHOIS</span>
@@ -327,7 +332,7 @@ export default function ChatFeed({
                         href={`https://nvd.nist.gov/vuln/detail/${threatCve}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem]"
+                        className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer"
                       >
                         <ExternalLink className="w-3 h-3 text-[var(--accent-light)]" />
                         <span>View NIST Advisory ({threatCve})</span>
@@ -338,7 +343,7 @@ export default function ChatFeed({
                     {(isDossier || threatIp || threatCve) && (
                       <button
                         onClick={() => handleExportStixBundle(msg.content, threatIp, threatCve, verdict)}
-                        className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--accent-primary)]/40 text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/20 hover:border-[var(--accent-primary)] flex items-center gap-1.5 transition-all text-[0.7rem]"
+                        className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--accent-primary)]/40 text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/20 hover:border-[var(--accent-primary)] flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer"
                       >
                         <Download className="w-3 h-3" />
                         <span>Export STIX 2.1 Bundle</span>

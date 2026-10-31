@@ -200,3 +200,4 @@ export function downloadStix21Bundle(bundle, filename = "cybersicker_stix21_expo
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+

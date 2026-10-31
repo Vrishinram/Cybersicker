@@ -1,31 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
-  Shield,
-  Layers,
-  AlertTriangle,
-  Clock,
-  Radar,
-  Globe,
-  Fingerprint,
-  Bug,
   Send,
-  Terminal,
-  Activity,
-  CheckCircle2,
   XCircle,
   Database,
   Sliders,
+  AlertTriangle,
+  Activity,
   Loader2,
   X,
   Sparkles,
 } from "lucide-react";
 
-import HeaderBar from "../components/HeaderBar";
-import SidebarDropzone from "../components/SidebarDropzone";
-import TelemetryDock, { LogEntry, LogLevel } from "../components/TelemetryDock";
+import Header from "../components/Header";
+import Sidebar, { ToolConfig } from "../components/Sidebar";
 import ChatFeed, { ChatMessage } from "../components/ChatFeed";
+import { LogEntry, LogLevel } from "../components/TelemetryDock";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -33,16 +24,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
    TYPES & CONSTANTS
    ═══════════════════════════════════════════ */
 
-type ToolModalConfig = {
-  tool: "scanner" | "ip" | "cve" | "mac" | "playbook";
-  title: string;
-  label: string;
-  description: string;
-  placeholder: string;
-  defaultValue: string;
-} | null;
-
-const TOOL_CONFIGS: Record<string, NonNullable<ToolModalConfig>> = {
+const TOOL_CONFIGS: Record<string, ToolConfig> = {
   scanner: {
     tool: "scanner",
     title: "Keras Autoencoder Anomaly Scanner",
@@ -110,7 +92,7 @@ export default function Home() {
   const [logFilter, setLogFilter] = useState<"ALL" | LogLevel>("ALL");
   const [chatLoading, setChatLoading] = useState(false);
   const [toolLoading, setToolLoading] = useState(false);
-  const [activeModal, setActiveModal] = useState<ToolModalConfig>(null);
+  const [activeModal, setActiveModal] = useState<ToolConfig | null>(null);
   const [modalInput, setModalInput] = useState("");
   const [threatLevel, setThreatLevel] = useState<"LOW" | "MONITORING" | "HIGH">("MONITORING");
   const [apiStatus, setApiStatus] = useState<"online" | "offline" | "checking">("checking");
@@ -201,12 +183,17 @@ export default function Home() {
     addLog("info", '{"event":"AGENT_ORCHESTRATION_READY","llm":"Gemini 2.5 Flash","status":"ONLINE"}');
   }, [addLog]);
 
-  // Session Control: History & Indicator Reset
+  // Requirement 3: Reset Session Control
   const resetSession = () => {
     setMessages([]);
     setBlockedIps(new Set());
     setThreatLevel("MONITORING");
-    addLog("info", '{"event":"SESSION_RESET","operator":"ACTIVE_USER","status":"READY"}');
+    const now = new Date();
+    const ts = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+    setLogs([
+      { ts, level: "info", msg: '{"event":"BOOT_INITIALIZE","platform":"CYBERSICKER_SOC","version":"2.5.0"}' },
+      { ts, level: "info", msg: '{"event":"SESSION_RESET","status":"READY"}' }
+    ]);
   };
 
   // Border Firewall Containment Action
@@ -243,10 +230,11 @@ export default function Home() {
         ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
         : `${(file.size / 1024).toFixed(1)} KB`;
 
-    // 1. Emit PCAP_INGEST_START telemetry event
+    // 1. Emit telemetry event: {"event":"FILE_INGESTED","filename": file.name, "size": file.size}
+    addLog("info", JSON.stringify({ event: "FILE_INGESTED", filename: file.name, size: file.size }));
     addLog("info", JSON.stringify({ event: "PCAP_INGEST_START", filename: file.name }));
 
-    // 2. Display parsing badge in the chat feed
+    // 2. Trigger parsing badge in the chat feed
     setMessages((prev) => [
       ...prev,
       {
@@ -281,7 +269,7 @@ export default function Home() {
         const anomalyPct = d.anomaly_percentage ?? ((anomalies / totalFlows) * 100).toFixed(2);
         const maxMse = d.max_mse ?? 0.089;
 
-        // Emit FLOW_EXTRACTION_COMPLETE and AUTOENCODER_INFERENCE_DONE
+        // Telemetry events
         addLog(
           "info",
           JSON.stringify({
@@ -311,7 +299,7 @@ export default function Home() {
           );
         }
 
-        // Determine Primary Outlier Services / Ports
+        // Determine Top Flagged Ports / Outlier Services
         let outlierServicesStr = "Port 445 SMB (18 flows), Port 22 SSH (5 flows)";
         if (d.top_anomalous_endpoints && d.top_anomalous_endpoints.length > 0) {
           const portsCount: Record<string, number> = {};
@@ -332,13 +320,13 @@ export default function Home() {
             ? "Quarantine anomalous source IPs at perimeter border firewall, sever active unauthorized sockets, and initiate endpoint memory forensic triage."
             : "All reconstructed flows conform to expected baseline. Continue standard telemetry monitoring.";
 
-        // Render Anomaly Detection Card directly in the main feed
+        // 3. Render Anomaly Detection Card directly in the main feed
         const reportContent = `### [ANOMALY DETECTION REPORT] Network Traffic Capture Ingestion
 
 - **File Name & Size:** \`${file.name}\` (${fileSizeStr})
 - **Total Flows Analyzed:** **${totalFlows.toLocaleString()}** bidirectional flows reconstructed
 - **Anomalies Detected:** **${anomalies}** (${anomalyPct}% of total traffic)
-- **Primary Outlier Services / Ports:** ${outlierServicesStr}
+- **Top Flagged Ports / Services:** ${outlierServicesStr}
 - **Recommended Next Step:** ${recommendedNextStep}
 
 ---
@@ -357,7 +345,7 @@ ${
     : ""
 }`;
 
-        // Replace the parsing badge with the final card
+        // Replace the parsing badge with the final summary card
         setMessages((prev) => {
           const next = [...prev];
           const lastIdx = next.length - 1;
@@ -394,7 +382,7 @@ ${
   };
 
   // Individual Tool Runner
-  const runTool = async (config: NonNullable<ToolModalConfig>, inputVal: string) => {
+  const runTool = async (config: ToolConfig, inputVal: string) => {
     setToolLoading(true);
     setActiveModal(null);
     addLog("info", `{"event":"TOOL_INVOKE","tool":"${config.tool}","parameter":"${inputVal}"}`);
@@ -614,7 +602,7 @@ ${
       )}
 
       {/* ═══════════ 2. APP HEADER (MODULAR COMPONENT WITH RESET) ═══════════ */}
-      <HeaderBar
+      <Header
         apiStatus={apiStatus}
         uptime={uptime}
         onResetSession={resetSession}
@@ -657,127 +645,18 @@ ${
 
       {/* ═══════════ 4. CORE TWO-COLUMN WORKSPACE ═══════════ */}
       <main className="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
-        {/* ── LEFT COLUMN (4 COLS): DISPATCH DOCK & LOG STREAM ── */}
-        <div className="lg:col-span-4 flex flex-col gap-5">
-          {/* Dispatch Arsenal Box */}
-          <div className="surface-panel p-4">
-            <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-[var(--border-subtle)]">
-              <div>
-                <h2 className="font-heading font-semibold text-xs text-[var(--text-high)] uppercase tracking-wide">
-                  Triage Tool Arsenal
-                </h2>
-                <p className="text-[0.68rem] text-[var(--text-muted)] mt-0.5">
-                  Launch individual intelligence enrichment modules
-                </p>
-              </div>
-              <Terminal className="w-4 h-4 text-[var(--accent-light)]" />
-            </div>
-
-            <div className="space-y-2">
-              {/* Tool 1 */}
-              <button
-                onClick={() => {
-                  setActiveModal(TOOL_CONFIGS.scanner);
-                  setModalInput(TOOL_CONFIGS.scanner.defaultValue);
-                }}
-                className="tool-arsenal-button group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0 group-hover:border-[var(--accent-light)] transition-colors">
-                    <Radar className="w-4 h-4 text-[var(--accent-light)]" />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium text-[0.82rem] text-[var(--text-high)] group-hover:text-white transition-colors">
-                      Network Traffic Anomaly Scan
-                    </div>
-                    <div className="text-[0.68rem] text-[var(--text-muted)]">
-                      Keras autoencoder MSE threshold scoring
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Tool 2 */}
-              <button
-                onClick={() => {
-                  setActiveModal(TOOL_CONFIGS.ip);
-                  setModalInput(TOOL_CONFIGS.ip.defaultValue);
-                }}
-                className="tool-arsenal-button group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0 group-hover:border-[var(--accent-light)] transition-colors">
-                    <Globe className="w-4 h-4 text-[var(--accent-light)]" />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium text-[0.82rem] text-[var(--text-high)] group-hover:text-white transition-colors">
-                      VirusTotal Threat Intelligence
-                    </div>
-                    <div className="text-[0.68rem] text-[var(--text-muted)]">
-                      IP reputation &amp; malicious score attribution
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Tool 3 */}
-              <button
-                onClick={() => {
-                  setActiveModal(TOOL_CONFIGS.cve);
-                  setModalInput(TOOL_CONFIGS.cve.defaultValue);
-                }}
-                className="tool-arsenal-button group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0 group-hover:border-[var(--accent-light)] transition-colors">
-                    <Bug className="w-4 h-4 text-[var(--accent-light)]" />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium text-[0.82rem] text-[var(--text-high)] group-hover:text-white transition-colors">
-                      NIST NVD CVE Advisory
-                    </div>
-                    <div className="text-[0.68rem] text-[var(--text-muted)]">
-                      CVSS score &amp; vulnerability metrics
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Tool 4 */}
-              <button
-                onClick={() => {
-                  setActiveModal(TOOL_CONFIGS.mac);
-                  setModalInput(TOOL_CONFIGS.mac.defaultValue);
-                }}
-                className="tool-arsenal-button group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0 group-hover:border-[var(--accent-light)] transition-colors">
-                    <Fingerprint className="w-4 h-4 text-[var(--accent-light)]" />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium text-[0.82rem] text-[var(--text-high)] group-hover:text-white transition-colors">
-                      Hardware OUI Resolution
-                    </div>
-                    <div className="text-[0.68rem] text-[var(--text-muted)]">
-                      IEEE MAC manufacturer mapping
-                    </div>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Modular Tool 5: Functional Drag-and-Drop Capture Ingestion (.pcap / .csv) */}
-          <SidebarDropzone
-            onFileSelected={handleFileUpload}
-            isLoading={fileUploadLoading}
-          />
-
-          {/* Modular System Telemetry Log Dock with Dynamic Formatting */}
-          <TelemetryDock
+        {/* ── LEFT COLUMN (4 COLS): MODULAR SIDEBAR & TELEMETRY DOCK ── */}
+        <div className="lg:col-span-4">
+          <Sidebar
+            toolConfigs={TOOL_CONFIGS}
+            onSelectTool={(cfg) => {
+              setActiveModal(cfg);
+              setModalInput(cfg.defaultValue);
+            }}
+            onFileUpload={handleFileUpload}
+            fileUploadLoading={fileUploadLoading}
             logs={logs}
-            filter={logFilter}
+            logFilter={logFilter}
             onFilterChange={setLogFilter}
           />
         </div>

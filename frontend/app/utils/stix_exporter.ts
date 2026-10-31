@@ -206,3 +206,4 @@ export function downloadStix21Bundle(bundle: StixBundle | Record<string, any>, f
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
