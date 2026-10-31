@@ -124,3 +124,4 @@ async def stream_telemetry_sse(request: Request):
 async def get_telemetry_history(limit: int = 25):
     """Returns the most recent buffered telemetry events."""
     return {"events": telemetry_service.get_recent(limit=limit)}
+

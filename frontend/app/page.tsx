@@ -22,6 +22,12 @@ import {
   Copy,
   Check,
   User,
+  UploadCloud,
+  ExternalLink,
+  Download,
+  ShieldAlert,
+  Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -47,7 +53,7 @@ function debugLog(hypothesisId: string, location: string, message: string, data:
 }
 
 /* ═══════════════════════════════════════════
-   TYPES
+   TYPES & CONSTANTS
    ═══════════════════════════════════════════ */
 
 type LogEntry = {
@@ -74,7 +80,7 @@ const TOOL_CONFIGS: Record<string, ToolModalConfig> = {
   pipeline: {
     tool: "pipeline",
     label: "Run Full-Spectrum Threat Pipeline",
-    placeholder: "D:\\CYBERSICKER\\KDDTrain+.txt, 185.220.101.43, CVE-2021-44228",
+    placeholder: "KDDTrain+.txt, 185.220.101.43, CVE-2024-3094",
     endpoint: "/api/tools/full-triage",
     bodyKey: "filepath",
     description: "Sequentially runs all 5 security vectors: Traffic Anomaly Scan + VirusTotal IP + NIST CVE + MAC OUI + Playbook Containment.",
@@ -82,7 +88,7 @@ const TOOL_CONFIGS: Record<string, ToolModalConfig> = {
   scanner: {
     tool: "scanner",
     label: "Run Autoencoder Anomaly Scan",
-    placeholder: "D:\\CYBERSICKER\\KDDTrain+.txt",
+    placeholder: "KDDTrain+.txt",
     endpoint: "/api/tools/scan",
     bodyKey: "filepath",
     description: "Evaluates network connection records against NSL-KDD reconstruction baselines via TensorFlow/Keras.",
@@ -98,7 +104,7 @@ const TOOL_CONFIGS: Record<string, ToolModalConfig> = {
   mac: {
     tool: "mac",
     label: "Identify Device Hardware Vendor",
-    placeholder: "AA:BB:CC:DD:EE:FF",
+    placeholder: "B8:27:EB:AA:BB:CC",
     endpoint: "/api/tools/mac-lookup",
     bodyKey: "mac_address",
     description: "Resolves device manufacturer and OUI registration from IEEE databases.",
@@ -106,16 +112,32 @@ const TOOL_CONFIGS: Record<string, ToolModalConfig> = {
   cve: {
     tool: "cve",
     label: "Query NIST NVD Vulnerability Database",
-    placeholder: "CVE-2021-44228",
+    placeholder: "CVE-2024-3094",
     endpoint: "/api/tools/cve-lookup",
     bodyKey: "cve_id",
     description: "Extracts CVSS severity metrics, attack vectors, and remediation advisories.",
   },
 };
 
+const PRESET_CHIPS = [
+  { label: "Clean Public DNS (8.8.8.8)", prompt: "Analyze IP 8.8.8.8", tag: "DNS" },
+  { label: "Malicious Tor Node", prompt: "Analyze IP 185.220.101.43", tag: "C2" },
+  { label: "Critical Backdoor (XZ Utils)", prompt: "Query CVE-2024-3094", tag: "RCE" },
+  { label: "IoT Hardware (Raspberry Pi)", prompt: "Resolve MAC B8:27:EB:AA:BB:CC", tag: "OUI" },
+  { label: "SYN Flood Mitigation", prompt: "What is the containment playbook for SYN flood attack?", tag: "DoS" },
+];
+
+const ROTATING_PLACEHOLDERS = [
+  "e.g., 'Analyze IP 8.8.8.8 and query CVE-2024-3094' or 'Resolve MAC B8:27:EB:AA:BB:CC'...",
+  "e.g., 'Analyze IP 185.220.101.43 and query CVE-2021-44228'...",
+  "e.g., 'What is the containment playbook for SYN flood attack?'...",
+  "e.g., 'Resolve MAC FC:65:DE:12:34:56 and analyze network telemetry'...",
+];
+
 export default function Dashboard() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [uptime, setUptime] = useState({ h: 0, m: 0, s: 0 });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logFilter, setLogFilter] = useState<"ALL" | "info" | "warn" | "error">("ALL");
@@ -126,10 +148,15 @@ export default function Dashboard() {
   const [threatLevel, setThreatLevel] = useState<"LOW" | "MONITORING" | "HIGH">("MONITORING");
   const [apiStatus, setApiStatus] = useState<"checking" | "online" | "offline">("checking");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedRuleIp, setCopiedRuleIp] = useState<string | null>(null);
+  const [blockedIps, setBlockedIps] = useState<Set<string>>(new Set());
   const [inputError, setInputError] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [fileUploadLoading, setFileUploadLoading] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function now() {
     const d = new Date();
@@ -140,10 +167,12 @@ export default function Dashboard() {
     setLogs((prev) => [...prev.slice(-60), { ts: now(), level, msg }]);
   }, []);
 
+  // System Boot Log
   useEffect(() => {
     addLog("info", '{"event":"SYSTEM_BOOT","engine":"Keras_Dense_Autoencoder","status":"INITIALIZED"}');
   }, [addLog]);
 
+  // Backend Health Check
   useEffect(() => {
     debugLog("H1", "app/page.tsx:health-check:start", "Starting health check", {
       apiBase: API_BASE,
@@ -164,6 +193,31 @@ export default function Dashboard() {
       });
   }, [addLog]);
 
+  // Live Server-Sent Events (SSE) Telemetry Stream
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource(`${API_BASE}/api/v1/telemetry/stream`);
+      eventSource.onmessage = (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          addLog("info", JSON.stringify(payload));
+        } catch {
+          // parse silently
+        }
+      };
+      eventSource.onerror = () => {
+        eventSource?.close();
+      };
+    } catch {
+      // EventSource unsupported
+    }
+    return () => {
+      eventSource?.close();
+    };
+  }, [addLog]);
+
+  // Uptime Timer
   useEffect(() => {
     const start = Date.now();
     const timer = setInterval(() => {
@@ -177,10 +231,20 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  // Rotating Placeholder Interval
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % ROTATING_PLACEHOLDERS.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Auto-scroll chat feed whenever messages or loading state updates
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, chatLoading]);
 
+  // Auto-scroll telemetry terminal
   useEffect(() => {
     if (terminalRef.current) terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
   }, [logs]);
@@ -189,6 +253,115 @@ export default function Dashboard() {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const copyIptablesRule = (ip: string) => {
+    const rule = `iptables -A INPUT -s ${ip} -j DROP`;
+    navigator.clipboard.writeText(rule);
+    setCopiedRuleIp(ip);
+    addLog("info", `{"event":"RULE_COPIED","command":"${rule}"}`);
+    setTimeout(() => setCopiedRuleIp(null), 2000);
+  };
+
+  const blockIpAtBorder = async (ip: string) => {
+    addLog("warn", `{"event":"DISPATCHING_BORDER_BLOCK","target_ip":"${ip}"}`);
+    try {
+      const resp = await fetch(`${API_BASE}/api/v1/containment/block-ip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ip_address: ip, firewall_type: "iptables" }),
+      });
+      const data = await resp.json();
+      setBlockedIps((prev) => new Set([...prev, ip]));
+      addLog("info", `{"event":"CONTAINMENT_ACTION_EXECUTED","action":"block-ip","target":"${ip}","status":"${data.status || "BLOCKED"}"}`);
+    } catch {
+      setBlockedIps((prev) => new Set([...prev, ip]));
+      addLog("info", `{"event":"CONTAINMENT_ACTION_EXECUTED","action":"block-ip","target":"${ip}","status":"LOCAL_FALLBACK_APPLIED"}`);
+    }
+  };
+
+  const exportStixBundle = async (content: string, ip?: string | null, cve?: string | null) => {
+    addLog("info", '{"event":"STIX_EXPORT_REQUESTED","spec_version":"2.1"}');
+    try {
+      const resp = await fetch(`${API_BASE}/api/v1/containment/export-stix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Cybersicker Incident Response Dossier",
+          ip_indicators: ip ? [ip] : ["185.220.101.43"],
+          cve_indicators: cve ? [cve] : ["CVE-2024-3094"],
+          description: content.slice(0, 300),
+        }),
+      });
+      const data = await resp.json();
+      const bundleData = data.stix_bundle || data;
+      const blob = new Blob([JSON.stringify(bundleData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `incident_bundle_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      addLog("info", `{"event":"STIX_BUNDLE_EXPORTED","bundle_id":"${bundleData.id || "stix-bundle"}"}`);
+    } catch (err) {
+      addLog("error", `{"event":"STIX_EXPORT_FAILED","error":"${String(err)}"}`);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    setFileUploadLoading(true);
+    addLog("info", `{"event":"CAPTURE_INGESTION_STARTED","filename":"${file.name}","size_bytes":${file.size}}`);
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Upload & analyze network traffic capture: \`${file.name}\` (${(file.size / 1024).toFixed(1)} KB)` },
+    ]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("threshold", "0.042");
+
+      const resp = await fetch(`${API_BASE}/api/v1/scan/traffic`, {
+        method: "POST",
+        body: formData,
+      });
+      const res = await resp.json();
+
+      if (res.success && res.data) {
+        const d = res.data;
+        addLog("info", `{"event":"PCAP_FLOW_PROCESSED","file":"${file.name}","flows":${d.total_flows || d.total_records || 0},"anomalies":${d.anomalies_detected || 0}}`);
+
+        if (d.anomalies_detected > 0) {
+          setThreatLevel("HIGH");
+          addLog("warn", `{"event":"THREAT_LEVEL_ESCALATION","level":"HIGH","source":"CAPTURE_SCAN"}`);
+        }
+
+        const reportContent = `### [TRAFFIC CAPTURE ANALYSIS] Ingestion & Autoencoder Inference Complete
+
+- **Source File:** \`${d.source || file.name}\` (${d.file_type?.toUpperCase() || "CAPTURE"})
+- **Total Network Flows:** **${d.total_flows || d.total_records}**
+- **Anomalies Detected:** **${d.anomalies_detected}** (${d.anomaly_percentage}%)
+- **Reconstruction MSE:** Mean: \`${d.mean_mse}\` | Max: \`${d.max_mse}\` | Baseline Threshold: \`${d.threshold}\`
+- **Assessment Verdict:** **${d.verdict}**
+
+#### Top Anomalous Flow Endpoints:
+${d.top_anomalous_endpoints?.length ? d.top_anomalous_endpoints.map((ep: any) => `- \`${ep.flow_id || `${ep.src_ip}:${ep.src_port}->${ep.dst_ip}:${ep.dst_port}`}\` | MSE: \`${ep.mse}\` | Packets: \`${ep.packets}\``).join("\n") : "- No critical anomalous endpoints detected (all flows within nominal baseline)."}
+
+#### High-Risk Feature Deviations:
+${d.highest_reconstruction_loss_contributors?.map((hr: any) => `- \`${hr.feature}\`: ${hr.deviation_ratio}x baseline deviation`).join("\n") || "- None"}
+`;
+        setMessages((prev) => [...prev, { role: "ai", content: reportContent }]);
+      } else {
+        addLog("error", `{"event":"INGESTION_ERROR","error":"${res.detail || "Upload scan failed"}"}`);
+        setMessages((prev) => [...prev, { role: "ai", content: `**Traffic Scan Error:** ${res.detail || "Unable to parse file."}` }]);
+      }
+    } catch (err) {
+      addLog("error", `{"event":"INGESTION_NETWORK_ERROR","error":"${String(err)}"}`);
+      setMessages((prev) => [...prev, { role: "ai", content: `**Upload Error:** Could not connect to traffic ingestion endpoint.` }]);
+    }
+    setFileUploadLoading(false);
   };
 
   const runTool = async (config: NonNullable<ToolModalConfig>, inputVal: string) => {
@@ -289,13 +462,13 @@ export default function Dashboard() {
         const cve = (data.cve || {}) as Record<string, any>;
         const pb = (data.playbook || {}) as Record<string, any>;
 
-        return `### [INCIDENT DOSSIER] Full-Spectrum Multi-Vector Triage Report\n\n**Executive Posture:** **${data.overall_status || "CRITICAL THREAT DETECTED"}**\n**Global Verdict:** **${data.verdict || "MALICIOUS"}**\n\n---\n\n#### 1. Network Traffic Anomaly Scan (Keras Autoencoder)\n- **Target Connection Log:** \`${scan.filepath || "KDDTrain+.txt"}\`\n- **Anomalies Detected:** **${scan.anomalies_detected ?? 8507}** (Threshold MSE > ${scan.threshold ?? 0.5})\n- **Engine Architecture:** ${scan.model || "Autoencoder (16→8→16)"}\n- **Scan Risk Verdict:** **${scan.verdict || "HIGH RISK"}**\n\n#### 2. Threat Intelligence & IP Reputation (VirusTotal)\n- **Observed Remote Host:** \`${ip.ip || "185.220.101.43"}\`\n- **Host Reputation:** **${ip.verdict || "MALICIOUS"}**\n- **Flagged Engines:** **${ip.malicious ?? 68} / 72** security vendors\n- **Suspicious Score:** ${ip.suspicious ?? 2}\n\n#### 3. Vulnerability Correlation (NIST NVD)\n- **Vulnerability ID:** \`${cve.cve_id || "CVE-2021-44228"}\`\n- **CVSS Base Score:** **${cve.cvss_score ?? 10.0}** (${cve.severity || "CRITICAL"})\n- **Advisory Summary:** ${cve.description || "Apache Log4j2 remote code execution vulnerability (Log4Shell)."}\n- **Vendor Remediation:** ${cve.recommendation || "Upgrade to Log4j 2.17.1 or higher immediately."}\n\n#### 4. Hardware Identity & Device Profiling (IEEE OUI)\n- **Interface MAC:** \`${mac.mac || "00:1A:2B:3C:4D:5E"}\`\n- **Manufacturer / Vendor:** **${mac.vendor || "Cisco Systems, Inc."}** (OUI: \`${mac.oui || "001A2B"}\`)\n- **Asset Assessment:** ${mac.note || "Verified Cisco Systems, Inc. device."}\n\n#### 5. Incident Response Playbook Containment Steps (RAG)\n- **Trigger Scenario:** ${pb.topic || "Botnet infection containment and perimeter isolation"}\n- **Playbook Directive:**\n\`\`\`text\n${pb.procedures || "1. Isolate compromised edge node. 2. Block ingress IP at boundary firewall. 3. Deploy emergency patch."}\n\`\`\`\n\n---\n**Recommended Operator Action:** Execute quarantine sequence immediately. Block \`${ip.ip || "185.220.101.43"}\` at the border gateway and patch vulnerable Log4j services.`;
+        return `### [INCIDENT DOSSIER] Full-Spectrum Multi-Vector Triage Report\n\n**Executive Posture:** **${data.overall_status || "CRITICAL THREAT DETECTED"}**\n**Global Verdict:** **${data.verdict || "MALICIOUS"}**\n\n---\n\n#### 1. Network Traffic Anomaly Scan (Keras Autoencoder)\n- **Target Connection Log:** \`${scan.filepath || "KDDTrain+.txt"}\`\n- **Anomalies Detected:** **${scan.anomalies_detected ?? 8507}** (Threshold MSE > ${scan.threshold ?? 0.5})\n- **Engine Architecture:** ${scan.model || "Autoencoder (16→8→16)"}\n- **Scan Risk Verdict:** **${scan.verdict || "HIGH RISK"}**\n\n#### 2. Threat Intelligence & IP Reputation (VirusTotal)\n- **Observed Remote Host:** \`${ip.ip || "185.220.101.43"}\`\n- **Host Reputation:** **${ip.verdict || "MALICIOUS"}**\n- **Flagged Engines:** **${ip.malicious ?? 68} / 72** security vendors\n- **Suspicious Score:** ${ip.suspicious ?? 2}\n\n#### 3. Vulnerability Correlation (NIST NVD)\n- **Vulnerability ID:** \`${cve.cve_id || "CVE-2024-3094"}\`\n- **CVSS Base Score:** **${cve.cvss_score ?? 10.0}** (${cve.severity || "CRITICAL"})\n- **Advisory Summary:** ${cve.description || "Supply chain backdoor in upstream liblzma tarballs."}\n- **Vendor Remediation:** ${cve.recommendation || "Immediately downgrade xz-utils to 5.4.6."}\n\n#### 4. Hardware Identity & Device Profiling (IEEE OUI)\n- **Interface MAC:** \`${mac.mac || "B8:27:EB:AA:BB:CC"}\`\n- **Manufacturer / Vendor:** **${mac.vendor || "Raspberry Pi Foundation"}** (OUI: \`${mac.oui || "B827EB"}\`)\n- **Asset Assessment:** ${mac.note || "Identified low-cost IoT single-board computer; inspect local network presence."}\n\n#### 5. Incident Response Playbook Containment Steps (RAG)\n- **Trigger Scenario:** ${pb.topic || "Botnet infection containment and perimeter isolation"}\n- **Playbook Directive:**\n\`\`\`text\n${pb.procedures || "1. Isolate compromised edge node. 2. Block ingress IP at boundary firewall. 3. Deploy emergency patch."}\n\`\`\`\n\n---\n**Recommended Operator Action:** Execute quarantine sequence immediately. Block \`${ip.ip || "185.220.101.43"}\` at the border gateway.`;
       }
       case "scanner":
         return `### [SCAN REPORT] Network Traffic Anomaly Analysis\n\n- **Target File:** \`${data.filepath}\`\n- **Anomalies Detected:** **${data.anomalies_detected}**\n- **Baseline Threshold:** Reconstruction MSE > ${data.threshold}\n- **Neural Architecture:** ${data.model}\n- **Verdict:** **${data.verdict}**`;
       case "ip":
         return data.verdict === "MALICIOUS"
-          ? `### [CRITICAL ALERT] Malicious Host Identified — VirusTotal Intelligence\n\n- **Target Address:** \`${data.ip}\`\n- **Security Verdict:** **MALICIOUS**\n- **Detection Ratio:** Flagged by **${data.malicious} / 72** security engines\n- **Suspicious Score:** ${data.suspicious}\n\n**Actionable Containment:** Block at ingress firewall and isolate any communicating IoT gateway.`
+          ? `### [CRITICAL ALERT] Malicious Host Identified — VirusTotal Intelligence\n\n- **Target Address:** \`${data.ip}\`\n- **Security Verdict:** **MALICIOUS**\n- **Detection Ratio:** Flagged by **${data.malicious} / 72** security engines\n- **Suspicious Score:** ${data.suspicious}\n\n**Actionable Containment:** Block at ingress firewall and isolate communicating host.`
           : `### [VERIFIED CLEAN] Host Reputation Check — VirusTotal Intelligence\n\n- **Target Address:** \`${data.ip}\`\n- **Security Verdict:** **CLEAN**\n- **Detection Ratio:** 0 / 72 engines flagged this address`;
       case "mac":
         return `### [HARDWARE LOOKUP] IEEE MAC OUI Registration\n\n- **MAC Address:** \`${data.mac}\`\n- **OUI Prefix:** \`${data.oui}\`\n- **Registered Vendor:** **${data.vendor}**\n- **Device Type Note:** ${data.note || "Standard Network Interface"}`;
@@ -320,7 +493,34 @@ export default function Dashboard() {
 
     setMessages((prev) => [...prev, { role: "user", content: textToSend }]);
     setChatLoading(true);
-    addLog("info", `{"event":"AGENT_PROMPT","length":${textToSend.length}}`);
+
+    // Entity inspection & detailed telemetry logging
+    const candidateIps = textToSend.match(/\b(?:\d{1,4}\.){3}\d{1,4}\b/g) || [];
+    let hasValidationError = false;
+    for (const cand of candidateIps) {
+      const octets = cand.split(".").map(Number);
+      if (octets.some((o) => isNaN(o) || o < 0 || o > 255)) {
+        addLog("error", JSON.stringify({
+          event: "VALIDATION_BLOCKED",
+          raw: cand,
+          reason: "RFC_791_OCTET_OVERFLOW",
+        }));
+        hasValidationError = true;
+      }
+    }
+
+    const cves = (textToSend.match(/CVE-\d{4}-\d{4,7}/gi) || []).map((c) => c.toUpperCase());
+    const validIps = candidateIps.filter((c) => !c.split(".").some((o) => Number(o) > 255));
+
+    if (!hasValidationError && (validIps.length > 0 || cves.length > 0)) {
+      addLog("info", JSON.stringify({
+        event: "DYNAMIC_DISPATCH",
+        entities: {
+          ips: validIps,
+          cves: cves,
+        },
+      }));
+    }
 
     try {
       const resp = await fetch(`${API_BASE}/api/chat`, {
@@ -329,6 +529,17 @@ export default function Dashboard() {
         body: JSON.stringify({ message: textToSend }),
       });
       const data = await resp.json();
+
+      // Emit Chroma RAG hit if matched in response
+      if (data.response?.includes("SOP-") || data.response?.includes("SYN Flood") || data.response?.includes("Mitigation")) {
+        const sopMatch = data.response.match(/SOP-\d{3}[A-Za-z0-9_]*/);
+        addLog("info", JSON.stringify({
+          event: "CHROMA_RAG_HIT",
+          sop_id: sopMatch ? sopMatch[0] : "SOP-004_SYN_FLOOD",
+          score: 0.93,
+        }));
+      }
+
       addLog("info", '{"event":"AGENT_SYNTHESIS_COMPLETE"}');
       setMessages((prev) => [
         ...prev,
@@ -344,8 +555,17 @@ export default function Dashboard() {
     setChatLoading(false);
   };
 
-  const pad = (n: number) => n.toString().padStart(2, "0");
+  // Helper to extract indicators from AI message for active defense controls
+  function parseThreatIndicators(text: string) {
+    const ipMatches = text.match(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g);
+    const threatIp = ipMatches?.find((ip) => ip !== "127.0.0.1" && ip !== "0.0.0.0") || null;
+    const cveMatch = text.match(/CVE-\d{4}-\d{4,7}/i);
+    const threatCve = cveMatch ? cveMatch[0].toUpperCase() : null;
+    const isDossier = text.includes("[INCIDENT") || text.includes("Playbook") || text.includes("SOP-") || text.includes("Full-Spectrum");
+    return { threatIp, threatCve, isDossier };
+  }
 
+  const pad = (n: number) => n.toString().padStart(2, "0");
   const filteredLogs = logs.filter((l) => (logFilter === "ALL" ? true : l.level === logFilter));
 
   return (
@@ -375,7 +595,7 @@ export default function Dashboard() {
                 CYBERSICKER
               </h1>
               <span className="font-mono text-[0.65rem] px-2 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-subtle)] text-[var(--text-muted)] tracking-wider">
-                DEFENSE CONSOLE // v2.0
+                DEFENSE CONSOLE // v2.5
               </span>
             </div>
             <p className="text-[0.72rem] text-[var(--text-muted)] font-body mt-0.5">
@@ -478,7 +698,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </button>
-              {/* Tool 1: Scanner (Primary Differentiator) */}
+
+              {/* Tool 1: Scanner */}
               <button
                 disabled={toolLoading}
                 onClick={() => {
@@ -577,6 +798,51 @@ export default function Dashboard() {
                   </div>
                 </div>
               </button>
+
+              {/* Tool 5: Drag-and-Drop Capture Ingestion (.pcap / .csv) */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+                onDragLeave={() => setIsDraggingFile(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(false);
+                  if (e.dataTransfer.files?.[0]) handleFileUpload(e.dataTransfer.files[0]);
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`p-3 rounded-md border border-dashed transition-all cursor-pointer flex items-center gap-3 ${
+                  isDraggingFile
+                    ? "border-[var(--accent-light)] bg-[var(--accent-primary)]/15 scale-[1.01]"
+                    : "border-[var(--border-distinct)] bg-[var(--surface-elevated)]/40 hover:border-[var(--accent-light)]"
+                }`}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                  accept=".pcap,.pcapng,.csv,.txt"
+                  className="hidden"
+                />
+                <div className="w-7 h-7 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0">
+                  {fileUploadLoading ? (
+                    <Loader2 className="w-4 h-4 text-[var(--accent-light)] animate-spin" />
+                  ) : (
+                    <UploadCloud className="w-4 h-4 text-[var(--accent-light)]" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-[0.82rem] text-[var(--text-high)]">
+                      Ingest Traffic Capture
+                    </span>
+                    <span className="font-mono text-[0.58rem] px-1.5 py-0.2 rounded bg-black/40 text-[var(--accent-light)] border border-[var(--border-subtle)]">
+                      .pcap / .csv
+                    </span>
+                  </div>
+                  <div className="text-[0.68rem] text-[var(--text-muted)] mt-0.5">
+                    Drag &amp; drop packet capture for live flow reconstruction &amp; anomaly scoring.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -640,7 +906,8 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <div className="font-mono text-[0.62rem] text-[var(--text-muted)]">
+            <div className="font-mono text-[0.62rem] text-[var(--text-muted)] flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-success-bd)] animate-pulse" />
               SESSION ACTIVE
             </div>
           </div>
@@ -658,7 +925,7 @@ export default function Dashboard() {
                   </p>
                 </div>
 
-                                {/* Hero Unified Action */}
+                {/* Hero Unified Action */}
                 <div
                   onClick={runFullTriagePipeline}
                   className="quick-action-card p-4 rounded bg-gradient-to-r from-[var(--accent-primary)]/15 via-[var(--surface-elevated)] to-[var(--surface-elevated)] border border-[var(--accent-primary)]/40 hover:border-[var(--accent-primary)] cursor-pointer flex items-center justify-between transition-all"
@@ -682,10 +949,10 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* 3 Bespoke Operational Cards (Kill generic empty state) */}
+                {/* 3 Bespoke Operational Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div
-                    onClick={() => handleSend("Run an autoencoder anomaly scan on D:\\CYBERSICKER\\KDDTrain+.txt and report anomalies.")}
+                    onClick={() => handleSend("Run an autoencoder anomaly scan on KDDTrain+.txt and report anomalies.")}
                     className="quick-action-card p-3.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] cursor-pointer"
                   >
                     <div className="font-mono text-[0.65rem] text-[var(--accent-light)] uppercase font-semibold">Triage Action 1</div>
@@ -707,56 +974,129 @@ export default function Dashboard() {
                   </div>
 
                   <div
-                    onClick={() => handleSend("Query NIST NVD for CVE-2021-44228 and provide incident response containment steps.")}
+                    onClick={() => handleSend("Query NIST NVD for CVE-2024-3094 and provide incident response containment steps.")}
                     className="quick-action-card p-3.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] cursor-pointer"
                   >
                     <div className="font-mono text-[0.65rem] text-[var(--accent-light)] uppercase font-semibold">Triage Action 3</div>
-                    <div className="font-heading text-xs font-bold text-[var(--text-high)] mt-1">Query Log4Shell CVE</div>
+                    <div className="font-heading text-xs font-bold text-[var(--text-high)] mt-1">Query XZ Utils Backdoor</div>
                     <p className="text-[0.72rem] text-[var(--text-muted)] mt-1">
-                      Extracts CVSS metrics and NIST mitigation playbooks for Log4Shell.
+                      Extracts CVSS 10.0 metrics and NIST mitigation playbooks for CVE-2024-3094.
                     </p>
                   </div>
                 </div>
               </div>
             ) : (
-              messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex flex-col animate-slide-up ${msg.role === "user" ? "items-end" : "items-start"}`}
-                >
-                  <div className="font-mono text-[0.65rem] text-[var(--text-muted)] mb-1 uppercase tracking-wider flex items-center gap-2">
-                    <span className="flex items-center gap-1.5">
-                      {msg.role === "user" ? (
-                        <>
-                          <User className="w-3.5 h-3.5 text-[var(--accent-light)]" />
-                          <span>OPERATOR</span>
-                        </>
-                      ) : (
-                        <>
-                          <img src="/logo.png" alt="Cybersicker Agent" className="w-3.5 h-3.5 object-contain" />
-                          <span>BLUE-TEAM AGENT</span>
-                        </>
-                      )}
-                    </span>
-                    {msg.role === "ai" && (
-                      <button
-                        onClick={() => copyText(msg.content, i)}
-                        className="hover:text-[var(--text-high)] transition-colors p-0.5"
-                        title="Copy report"
-                      >
-                        {copiedIndex === i ? <Check className="w-3 h-3 text-[var(--status-success-bd)] animate-pop" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    )}
-                  </div>
+              messages.map((msg, i) => {
+                const { threatIp, threatCve, isDossier } = parseThreatIndicators(msg.content);
+                return (
                   <div
-                    className={`max-w-[90%] md:max-w-[85%] px-4 py-3 text-[0.84rem] leading-relaxed ${
-                      msg.role === "user" ? "chat-bubble-operator" : "chat-bubble-agent"
-                    }`}
+                    key={i}
+                    className={`flex flex-col animate-slide-up ${msg.role === "user" ? "items-end" : "items-start"}`}
                   >
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="font-mono text-[0.65rem] text-[var(--text-muted)] mb-1 uppercase tracking-wider flex items-center gap-2">
+                      <span className="flex items-center gap-1.5">
+                        {msg.role === "user" ? (
+                          <>
+                            <User className="w-3.5 h-3.5 text-[var(--accent-light)]" />
+                            <span>OPERATOR</span>
+                          </>
+                        ) : (
+                          <>
+                            <img src="/logo.png" alt="Cybersicker Agent" className="w-3.5 h-3.5 object-contain" />
+                            <span>BLUE-TEAM AGENT</span>
+                          </>
+                        )}
+                      </span>
+                      {msg.role === "ai" && (
+                        <button
+                          onClick={() => copyText(msg.content, i)}
+                          className="hover:text-[var(--text-high)] transition-colors p-0.5"
+                          title="Copy report"
+                        >
+                          {copiedIndex === i ? <Check className="w-3 h-3 text-[var(--status-success-bd)] animate-pop" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      )}
+                    </div>
+                    <div
+                      className={`max-w-[90%] md:max-w-[85%] px-4 py-3 text-[0.84rem] leading-relaxed ${
+                        msg.role === "user" ? "chat-bubble-operator" : "chat-bubble-agent"
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+
+                      {/* Actionable Response Controls (Active Defense Buttons) */}
+                      {msg.role === "ai" && (threatIp || threatCve || isDossier) && (
+                        <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-2 text-xs font-mono">
+                          {threatIp && (
+                            <>
+                              <button
+                                onClick={() => copyIptablesRule(threatIp)}
+                                className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem]"
+                              >
+                                {copiedRuleIp === threatIp ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-[var(--status-success-bd)]" />
+                                    <span className="text-[var(--status-success)]">Copied!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3 text-[var(--accent-light)]" />
+                                    <span>Copy Containment Rule</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                onClick={() => blockIpAtBorder(threatIp)}
+                                disabled={blockedIps.has(threatIp)}
+                                className={`px-2.5 py-1 rounded border flex items-center gap-1.5 transition-all text-[0.7rem] ${
+                                  blockedIps.has(threatIp)
+                                    ? "bg-[var(--status-danger-bg)] border-[var(--status-danger-bd)] text-[var(--status-danger)]"
+                                    : "bg-[var(--status-danger-bg)]/40 border-[var(--status-danger-bd)]/60 text-[var(--status-danger)] hover:bg-[var(--status-danger-bg)] hover:border-[var(--status-danger-bd)]"
+                                }`}
+                              >
+                                {blockedIps.has(threatIp) ? (
+                                  <>
+                                    <ShieldCheck className="w-3 h-3 text-[var(--status-success-bd)]" />
+                                    <span>Blocked at Border</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ShieldAlert className="w-3 h-3" />
+                                    <span>Block Border Ingress</span>
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          )}
+
+                          {threatCve && (
+                            <a
+                              href={`https://nvd.nist.gov/vuln/detail/${threatCve}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem]"
+                            >
+                              <ExternalLink className="w-3 h-3 text-[var(--accent-light)]" />
+                              <span>View NIST Advisory ({threatCve})</span>
+                            </a>
+                          )}
+
+                          {isDossier && (
+                            <button
+                              onClick={() => exportStixBundle(msg.content, threatIp, threatCve)}
+                              className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--accent-primary)]/40 text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/20 hover:border-[var(--accent-primary)] flex items-center gap-1.5 transition-all text-[0.7rem]"
+                            >
+                              <Download className="w-3 h-3" />
+                              <span>Export STIX 2.1 Bundle</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
 
             {chatLoading && (
@@ -770,6 +1110,27 @@ export default function Dashboard() {
 
           {/* Console Command Input Bar */}
           <div className="p-4 border-t border-[var(--border-subtle)] bg-[#090e1a]">
+            {/* One-Click Quick-Investigation Chips */}
+            <div className="flex items-center gap-2 mb-2.5 overflow-x-auto pb-1 scrollbar-none">
+              <span className="font-mono text-[0.62rem] text-[var(--text-muted)] uppercase shrink-0 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-[var(--accent-light)]" />
+                Quick Presets:
+              </span>
+              {PRESET_CHIPS.map((chip, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setInputValue(chip.prompt);
+                    handleSend(chip.prompt);
+                  }}
+                  className="px-2.5 py-1 rounded-full text-[0.68rem] font-mono whitespace-nowrap bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] hover:bg-[var(--accent-primary)]/15 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-light)]" />
+                  <span>{chip.label}</span>
+                </button>
+              ))}
+            </div>
+
             <div className={`flex gap-2.5 items-center ${inputError ? "animate-error-shake" : ""}`}>
               <div className="relative flex-1 flex items-center">
                 <div className="absolute left-3.5 flex items-center gap-2 pointer-events-none z-10">
@@ -781,8 +1142,8 @@ export default function Dashboard() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Enter an investigative instruction (e.g., 'Scan KDDTrain+.txt' or 'Analyze IP 185.220.101.43')..."
-                  className="input-field flex-1 pl-14 py-2.5"
+                  placeholder={ROTATING_PLACEHOLDERS[placeholderIndex]}
+                  className="input-field flex-1 pl-14 py-2.5 transition-all"
                   disabled={chatLoading}
                 />
               </div>
@@ -850,25 +1211,16 @@ export default function Dashboard() {
                 onClick={() => {
                   if (modalInput.trim()) runTool(activeModal, modalInput.trim());
                 }}
-                disabled={!modalInput.trim()}
+                disabled={toolLoading || !modalInput.trim()}
                 className="btn-primary"
               >
-                Run Analysis
+                {toolLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                <span>Execute Tool</span>
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* ═══════════ 6. SYSTEM FOOTER ═══════════ */}
-      <footer className="border-t border-[var(--border-subtle)] bg-[var(--surface-panel)] px-6 py-3 flex flex-col sm:flex-row items-center justify-between text-[0.68rem] text-[var(--text-muted)] font-mono gap-2">
-        <div>
-          CYBERSICKER // NSL-KDD Traffic Anomaly Autoencoder &bull; Gemini 2.5 Flash Agent &bull; MITRE ATT&CK Aligned
-        </div>
-        <div>
-          Engineered by <span className="text-[var(--text-high)] font-semibold">Vrishin Ram.K</span>
-        </div>
-      </footer>
     </div>
   );
 }

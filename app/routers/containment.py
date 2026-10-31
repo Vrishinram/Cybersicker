@@ -304,3 +304,4 @@ async def export_stix_bundle(req: ExportSTIXRequest):
         "spec_version": "2.1",
         "stix_bundle": stix_bundle
     }
+
