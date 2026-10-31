@@ -5,6 +5,7 @@ for the Next.js frontend dashboard.
 """
 
 import os
+import re
 import sys
 import json
 import traceback
@@ -279,6 +280,11 @@ async def cve_lookup(req: CVERequest):
                 "published": "2023-03-14", "cvss_score": 9.8, "severity": "CRITICAL",
                 "description": "Microsoft Outlook Elevation of Privilege Vulnerability.",
                 "recommendation": "Apply latest Microsoft Outlook patches."
+            },
+            "CVE-2024-3094": {
+                "published": "2024-03-29", "cvss_score": 10.0, "severity": "CRITICAL",
+                "description": "Malicious code discovered in xz-utils upstream tarballs (liblzma versions 5.6.0 and 5.6.1) intercepting OpenSSH sshd process authentication to allow unauthorized remote code execution.",
+                "recommendation": "Immediately downgrade xz-utils to version 5.4.x, terminate unauthorized SSH sessions, and revoke potentially compromised keys."
             }
         }
         if cve_id in mock_cves:
@@ -435,6 +441,187 @@ async def full_triage(req: FullTriageRequest):
 # ═══════════════════════════════════════════════════════════════
 # AGENT CHAT — LLM + Tools
 # ═══════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════
+# REGEX ENTITY EXTRACTION & DYNAMIC TOOL DISPATCH
+# ═══════════════════════════════════════════════════════════════
+IPV4_REGEX = re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b')
+CVE_REGEX = re.compile(r'CVE-\d{4}-\d{4,7}', re.IGNORECASE)
+MAC_REGEX = re.compile(r'(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})')
+
+def extract_entities(text: str):
+    return {
+        "ips": IPV4_REGEX.findall(text),
+        "cves": [c.upper() for c in CVE_REGEX.findall(text)],
+        "macs": MAC_REGEX.findall(text),
+    }
+
+async def dynamic_dispatch_prompt(prompt: str) -> dict:
+    entities = extract_entities(prompt)
+    raw_ips = entities["ips"]
+    raw_cves = entities["cves"]
+    raw_macs = entities["macs"]
+
+    msg_lower = prompt.lower()
+
+    # Determine requested vectors
+    wants_all = any(k in msg_lower for k in ["combine", "all tools", "full triage", "full-spectrum", "pipeline", "all vectors", "everything"])
+    wants_ip = bool(raw_ips) or any(k in msg_lower for k in ["ip", "virustotal", "reputation", "host", "address"])
+    wants_cve = bool(raw_cves) or any(k in msg_lower for k in ["cve", "vulnerability", "nist", "nvd", "exploit", "advisory"])
+    wants_mac = bool(raw_macs) or any(k in msg_lower for k in ["mac", "oui", "hardware", "manufacturer", "device"])
+    wants_scan = any(k in msg_lower for k in ["scan", "autoencoder", "kdd", "anomaly", "anomalies", "traffic log", "packet"])
+    wants_playbook = any(k in msg_lower for k in ["playbook", "containment", "procedure", "sop", "mitigation", "ransomware", "botnet"])
+
+    # If full combined triage is requested
+    if wants_all:
+        target_ip = raw_ips[0] if raw_ips else "185.220.101.43"
+        target_cve = raw_cves[0] if raw_cves else "CVE-2021-44228"
+        target_mac = raw_macs[0] if raw_macs else "00:1A:2B:3C:4D:5E"
+        triage_resp = await full_triage(FullTriageRequest(
+            filepath="D:\\CYBERSICKER\\KDDTrain+.txt",
+            ip_address=target_ip,
+            cve_id=target_cve,
+            mac_address=target_mac,
+            incident_type="Botnet infection containment and perimeter isolation"
+        ))
+        if triage_resp.success:
+            parsed = json.loads(triage_resp.result)
+            return {
+                "handled": True,
+                "text": (
+                    f"### [INCIDENT DOSSIER] Full-Spectrum Multi-Vector Triage Report\n\n"
+                    f"**Executive Posture:** **{parsed.get('overall_status', 'CRITICAL THREAT DETECTED')}**\n"
+                    f"**Global Verdict:** **{parsed.get('verdict', 'MALICIOUS')}**\n\n"
+                    f"---\n\n"
+                    f"#### 1. Network Traffic Anomaly Scan (Keras Autoencoder)\n"
+                    f"- **Target Connection Log:** `{parsed.get('scan', {}).get('filepath')}`\n"
+                    f"- **Anomalies Detected:** **{parsed.get('scan', {}).get('anomalies_detected')}** (Threshold MSE > {parsed.get('scan', {}).get('threshold')})\n"
+                    f"- **Engine Architecture:** {parsed.get('scan', {}).get('model')}\n"
+                    f"- **Scan Risk Verdict:** **{parsed.get('scan', {}).get('verdict')}**\n\n"
+                    f"#### 2. Threat Intelligence & IP Reputation (VirusTotal)\n"
+                    f"- **Observed Remote Host:** `{parsed.get('ip', {}).get('ip')}`\n"
+                    f"- **Host Reputation:** **{parsed.get('ip', {}).get('verdict')}**\n"
+                    f"- **Flagged Engines:** **{parsed.get('ip', {}).get('malicious', 0)} / 72** security vendors\n"
+                    f"- **Suspicious Score:** {parsed.get('ip', {}).get('suspicious', 0)}\n\n"
+                    f"#### 3. Vulnerability Correlation (NIST NVD)\n"
+                    f"- **Vulnerability ID:** `{parsed.get('cve', {}).get('cve_id')}`\n"
+                    f"- **CVSS Base Score:** **{parsed.get('cve', {}).get('cvss_score')}** ({parsed.get('cve', {}).get('severity')})\n"
+                    f"- **Advisory Summary:** {parsed.get('cve', {}).get('description')}\n"
+                    f"- **Vendor Remediation:** {parsed.get('cve', {}).get('recommendation')}\n\n"
+                    f"#### 4. Hardware Identity & Device Profiling (IEEE OUI)\n"
+                    f"- **Interface MAC:** `{parsed.get('mac', {}).get('mac')}`\n"
+                    f"- **Manufacturer / Vendor:** **{parsed.get('mac', {}).get('vendor')}** (OUI: `{parsed.get('mac', {}).get('oui')}`)\n"
+                    f"- **Asset Assessment:** {parsed.get('mac', {}).get('note')}\n\n"
+                    f"#### 5. Incident Response Playbook Containment Steps (RAG)\n"
+                    f"- **Trigger Scenario:** {parsed.get('playbook', {}).get('topic')}\n"
+                    f"```text\n{parsed.get('playbook', {}).get('procedures')}\n```"
+                )
+            }
+
+    sections = []
+
+    # Traffic Scan
+    if wants_scan:
+        scan_resp = await network_scan(ScanRequest(filepath="D:\\CYBERSICKER\\KDDTrain+.txt"))
+        if scan_resp.success:
+            s_data = json.loads(scan_resp.result)
+            sections.append(
+                f"### [SCAN REPORT] Network Traffic Anomaly Analysis\n\n"
+                f"- **Target File:** `{s_data.get('filepath')}`\n"
+                f"- **Anomalies Detected:** **{s_data.get('anomalies_detected')}**\n"
+                f"- **Baseline Threshold:** Reconstruction MSE > {s_data.get('threshold')}\n"
+                f"- **Neural Architecture:** {s_data.get('model')}\n"
+                f"- **Verdict:** **{s_data.get('verdict')}**"
+            )
+
+    # VirusTotal IP Check
+    if wants_ip:
+        ips_to_check = raw_ips if raw_ips else ["185.220.101.43"]
+        for ip in ips_to_check:
+            ip_resp = await check_ip(IPRequest(ip_address=ip))
+            if ip_resp.success:
+                ip_data = json.loads(ip_resp.result)
+                verdict = ip_data.get("verdict", "UNKNOWN")
+                mal = ip_data.get("malicious", 0)
+                susp = ip_data.get("suspicious", 0)
+                note = ip_data.get("note", "")
+
+                if verdict == "MALICIOUS":
+                    sections.append(
+                        f"### [CRITICAL ALERT] Malicious Host Identified — VirusTotal Intelligence\n\n"
+                        f"- **Target Address:** `{ip}`\n"
+                        f"- **Security Verdict:** **MALICIOUS**\n"
+                        f"- **Detection Ratio:** Flagged by **{mal} / 72** security engines\n"
+                        f"- **Suspicious Score:** {susp}\n"
+                        + (f"- **Intelligence Note:** {note}\n" if note else "") +
+                        f"\n**Actionable Containment:** Block at ingress firewall and isolate any communicating IoT gateway."
+                    )
+                else:
+                    sections.append(
+                        f"### [VERIFIED CLEAN] Host Reputation Check — VirusTotal Intelligence\n\n"
+                        f"- **Target Address:** `{ip}`\n"
+                        f"- **Security Verdict:** **CLEAN**\n"
+                        f"- **Detection Ratio:** {mal} / 72 engines flagged this address\n"
+                        + (f"- **Intelligence Note:** {note}\n" if note else "") +
+                        f"- **Status:** No malicious activities reported for this host."
+                    )
+
+    # NIST NVD CVE Lookup
+    if wants_cve:
+        cves_to_check = raw_cves if raw_cves else ["CVE-2021-44228"]
+        for cve_id in cves_to_check:
+            cve_resp = await cve_lookup(CVERequest(cve_id=cve_id))
+            if cve_resp.success:
+                cve_data = json.loads(cve_resp.result)
+                if cve_data.get("found"):
+                    sections.append(
+                        f"### [VULNERABILITY REPORT] NIST NVD Advisory: {cve_id}\n\n"
+                        f"- **Published Date:** {cve_data.get('published')}\n"
+                        f"- **CVSS Base Score:** **{cve_data.get('cvss_score')}** ({cve_data.get('severity')})\n"
+                        f"- **Summary:** {cve_data.get('description', '')[:350]}...\n"
+                        f"- **Remediation:** {cve_data.get('recommendation', 'Apply vendor security patch.')}"
+                    )
+                else:
+                    sections.append(
+                        f"### [RECORD NOT FOUND] NIST NVD Advisory: {cve_id}\n\n"
+                        f"No active NVD entry found for `{cve_id}`. Verify CVE formatting or query local cache."
+                    )
+
+    # MAC Lookup
+    if wants_mac:
+        macs_to_check = raw_macs if raw_macs else ["00:1A:2B:3C:4D:5E"]
+        for mac in macs_to_check:
+            mac_resp = await mac_lookup(MACRequest(mac_address=mac))
+            if mac_resp.success:
+                m_data = json.loads(mac_resp.result)
+                sections.append(
+                    f"### [HARDWARE LOOKUP] IEEE MAC OUI Registration\n\n"
+                    f"- **MAC Address:** `{m_data.get('mac')}`\n"
+                    f"- **OUI Prefix:** `{m_data.get('oui')}`\n"
+                    f"- **Registered Vendor:** **{m_data.get('vendor')}**\n"
+                    f"- **Device Type Note:** {m_data.get('note', 'Standard Network Interface')}"
+                )
+
+    # Playbook Consultation
+    if wants_playbook:
+        pb_topic = "botnet" if "botnet" in msg_lower else ("ddos" if "flood" in msg_lower or "ddos" in msg_lower else "ransomware")
+        pb_resp = await consult_playbook(PlaybookRequest(incident_type=pb_topic))
+        if pb_resp.success:
+            pb_data = json.loads(pb_resp.result)
+            sections.append(
+                f"### [PLAYBOOK DIRECTIVE] Incident Response SOP\n\n"
+                f"- **Incident Classification:** {pb_topic.upper()}\n"
+                f"```text\n{pb_data.get('content', '')[:500]}\n```"
+            )
+
+    if sections:
+        return {
+            "handled": True,
+            "text": "\n\n---\n\n".join(sections)
+        }
+    return {"handled": False, "text": ""}
+
+
 @app.post("/api/chat")
 async def agent_chat(req: ChatRequest):
     debug_log("B1", "api.py:agent_chat:entry", "Chat request entered", {
@@ -445,264 +632,112 @@ async def agent_chat(req: ChatRequest):
         "openrouter_key_set": bool(OPENROUTER_API_KEY),
         "scitely_key_set": bool(SCITELY_API_KEY),
     })
-    if not GOOGLE_API_KEY and not GROQ_API_KEY and not OPENROUTER_API_KEY and not SCITELY_API_KEY:
-        debug_log("B1", "api.py:agent_chat:sandbox", "No keys found, entering Sandbox Mode", {})
-        return {
-            "success": True,
-            "response": (
-                "[STATUS] Cybersicker Local Mode Active\n\n"
-                "I am running in **Keyless Sandbox Mode**. I can assist with general cybersecurity inquiries, but my autonomous tool-calling capabilities are limited.\n\n"
-                "- **Available:** Network Scan (Simulated), IP Rep (Mock), CVE Query (Simulated)\n"
-                "- **Required:** Add a `GOOGLE_API_KEY` or `SCITELY_API_KEY` to `.env` for full autonomous power.\n\n"
-                "How can I assist your SOC operations today?"
-            ),
-        }
-    try:
-        from langchain.tools import tool
-        from autoencoder import run_network_scan as _run_scan
 
-        @tool
-        def network_scanner(filepath: str) -> str:
-            """Scan network traffic logs for cyber attacks or anomalies."""
+    # Step 1: Run Dynamic Entity Extraction & Tool Dispatch
+    dispatch = await dynamic_dispatch_prompt(req.message)
+
+    # Step 2: Check for configured LLM
+    llm = None
+    provider = "none"
+    if GOOGLE_API_KEY:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, api_key=GOOGLE_API_KEY)
+        provider = "google"
+    elif GROQ_API_KEY:
+        from langchain_groq import ChatGroq
+        llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0, api_key=GROQ_API_KEY)
+        provider = "groq"
+    elif OPENROUTER_API_KEY:
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(
+            model="openai/gpt-4o-mini",
+            temperature=0,
+            api_key=OPENROUTER_API_KEY,
+            base_url="https://openrouter.ai/api/v1",
+        )
+        provider = "openrouter"
+    elif SCITELY_API_KEY:
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(
+            model=SCITELY_MODEL,
+            temperature=0,
+            api_key=SCITELY_API_KEY,
+            base_url=SCITELY_BASE_URL,
+        )
+        provider = "scitely"
+
+    # Step 3: Synthesize response
+    if dispatch["handled"]:
+        # If tools were dynamically dispatched, return exact findings
+        # (Optionally enhance with LLM if available and responsive)
+        if llm:
             try:
-                anomalies = _run_scan(filepath)
-                return f"Scan complete. Found {anomalies} anomalies."
+                system_prompt = (
+                    "You are Cybersicker, an elite AI cybersecurity SOC agent designed by Vrishin Ram K. "
+                    "The operator provided a security instruction. Below are the verified technical tool outputs "
+                    "generated from the operator's exact entities. Provide a brief executive briefing followed by the structured technical findings. "
+                    "CRITICAL: Do NOT alter, omit, or replace the IP addresses, CVE identifiers, CVSS metrics, MAC addresses, or verdicts."
+                )
+                user_content = f"Instruction: {req.message}\n\nVerified Tool Findings:\n{dispatch['text']}"
+                llm_res = llm.invoke([("system", system_prompt), ("user", user_content)])
+                if llm_res and getattr(llm_res, "content", None):
+                    return {"success": True, "response": llm_res.content}
             except Exception as e:
-                return f"Failed to run scanner: {str(e)}"
-
-        @tool
-        def check_ip_virustotal(ip_address: str) -> str:
-            """Investigate an IP using VirusTotal. Input must be an IPv4 address."""
-            try:
-                url = f"https://www.virustotal.com/api/v3/ip_addresses/{ip_address}"
-                headers = {"accept": "application/json", "x-apikey": VT_API_KEY}
-                resp = requests.get(url, headers=headers, timeout=15)
-                if resp.status_code == 200:
-                    stats = resp.json()['data']['attributes']['last_analysis_stats']
-                    mal = stats.get('malicious', 0)
-                    return f"CRITICAL: {mal} vendors flagged {ip_address} as malicious!" if mal > 0 else f"CLEAN: 0 vendors flagged {ip_address}."
-                return f"API error {resp.status_code}"
-            except Exception as e:
-                return f"Error: {str(e)}"
-
-        @tool
-        def lookup_mac_address(mac_address: str) -> str:
-            """Look up device manufacturer by MAC address."""
-            try:
-                resp = requests.get(f"https://api.macvendors.com/{mac_address}", timeout=10)
-                return f"Vendor: {resp.text.strip()}" if resp.status_code == 200 else "Vendor not found."
-            except Exception as e:
-                return f"Error: {str(e)}"
-
-        @tool
-        def query_cve_database(cve_id: str) -> str:
-            """Query NIST NVD for CVE details. Input: CVE-XXXX-XXXXX."""
-            try:
-                resp = requests.get(f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id.strip().upper()}", timeout=15)
-                if resp.status_code == 200:
-                    vulns = resp.json().get("vulnerabilities", [])
-                    if not vulns:
-                        return f"{cve_id} not found."
-                    cve = vulns[0]["cve"]
-                    desc = next((d["value"] for d in cve.get("descriptions", []) if d["lang"] == "en"), "No description.")
-                    return f"CVE: {cve_id}\nDescription: {desc[:400]}"
-                return f"API error {resp.status_code}"
-            except Exception as e:
-                return f"Error: {str(e)}"
-
-        @tool
-        def consult_playbook_tool(incident_type: str) -> str:
-            """Search the IR Playbook for response procedures."""
-            try:
-                from langchain_community.document_loaders import TextLoader
-                from langchain_community.vectorstores import Chroma
-                from langchain_community.embeddings import HuggingFaceEmbeddings
-                from langchain_text_splitters import CharacterTextSplitter
-                loader = TextLoader(os.path.join(BASE_DIR, "playbook.env.txt"))
-                docs = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100).split_documents(loader.load())
-                db = Chroma.from_documents(docs, HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"))
-                results = db.similarity_search(incident_type, k=3)
-                return "\n---\n".join([r.page_content for r in results]) if results else "No match found."
-            except Exception as e:
-                return f"Error: {str(e)}"
-
-        @tool
-        def run_full_spectrum_triage(filepath: str = "D:\\CYBERSICKER\\KDDTrain+.txt", ip_address: str = "185.220.101.43", cve_id: str = "CVE-2021-44228", mac_address: str = "00:1A:2B:3C:4D:5E", incident_type: str = "Botnet infection") -> str:
-            """Run all 5 security tools together in a unified multi-vector pipeline: autoencoder network scan, VirusTotal IP reputation, NIST NVD CVE query, MAC vendor lookup, and incident playbook consultation. Use this whenever asked to combine all tools, run all tools, or do full spectrum triage."""
-            res1 = network_scanner.invoke({"filepath": filepath})
-            res2 = check_ip_virustotal.invoke({"ip_address": ip_address})
-            res3 = query_cve_database.invoke({"cve_id": cve_id})
-            res4 = lookup_mac_address.invoke({"mac_address": mac_address})
-            res5 = consult_playbook_tool.invoke({"incident_type": incident_type})
-            return f"FULL-SPECTRUM TRIAGE REPORT:\n1. NETWORK SCAN:\n{res1}\n\n2. VIRUSTOTAL IP REPUTATION:\n{res2}\n\n3. NIST NVD CVE:\n{res3}\n\n4. DEVICE MAC OUI:\n{res4}\n\n5. PLAYBOOK PROCEDURES:\n{res5}"
-
-        llm = None
-        provider = "none"
-        if GOOGLE_API_KEY:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, api_key=GOOGLE_API_KEY)
-            provider = "google"
-        elif GROQ_API_KEY:
-            from langchain_groq import ChatGroq
-            llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0, api_key=GROQ_API_KEY)
-            provider = "groq"
-        elif OPENROUTER_API_KEY:
-            from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(
-                model="openai/gpt-4o-mini",
-                temperature=0,
-                api_key=OPENROUTER_API_KEY,
-                base_url="https://openrouter.ai/api/v1",
-            )
-            provider = "openrouter"
-        elif SCITELY_API_KEY:
-            from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(
-                model=SCITELY_MODEL,
-                temperature=0,
-                api_key=SCITELY_API_KEY,
-                base_url=SCITELY_BASE_URL,
-            )
-            provider = "scitely"
-
-        debug_log("B4", "api.py:agent_chat:provider", "Selected chat provider", {
-            "provider": provider
-        })
-
-        if llm is None:
-            raise RuntimeError("No valid chat provider configured.")
-
-        # LangChain Agents usually require a prompt template. 
-        # We'll use a more direct approach if create_agent is missing or failing.
-        tools = [run_full_spectrum_triage, network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook_tool]
+                debug_log("B5", "api.py:agent_chat:llm_synthesis_fallback", f"LLM synthesis failed: {str(e)}", {})
         
+        # Return authoritative dynamic tool dispatch result directly
+        return {"success": True, "response": dispatch["text"]}
+
+    # If no specific tools were triggered, handle conversational requests
+    if llm:
         try:
-            # Try standard tool calling if supported by the LLM
-            llm_with_tools = llm.bind_tools(tools)
-            
-            # Simple manual agent loop for maximum compatibility
-            messages = [
-                ("system", (
-                    "You are Cybersicker, an elite cybersecurity SOC agent designed by Vrishin Ram K. "
-                    "You analyze IoT network threats using your tools. Always format responses neatly with markdown. "
-                    "Use bold for key findings, code blocks for IPs/hashes, and bullet points for structured data."
-                )),
-                ("user", req.message)
-            ]
-            
-            ai_msg = llm_with_tools.invoke(messages)
-            
-            # Basic tool execution logic
-            tool_map = {tool.name: tool for tool in tools}
-            if ai_msg.tool_calls:
-                for tool_call in ai_msg.tool_calls:
-                    selected_tool = tool_map[tool_call["name"].lower().replace("-", "_")]
-                    tool_output = selected_tool.invoke(tool_call["args"])
-                    messages.append(ai_msg)
-                    messages.append(("tool", tool_output, tool_call["id"]))
-                
-                # Final response after tool calls
-                final_response = llm_with_tools.invoke(messages)
-                answer = final_response.content
-            else:
-                answer = ai_msg.content
+            system_prompt = (
+                "You are Cybersicker, an elite cybersecurity SOC agent designed by Vrishin Ram K. "
+                "You assist SOC operators with network traffic anomaly detection, threat intelligence, and CVE analysis. "
+                "Format responses cleanly with markdown and bold key findings."
+            )
+            llm_res = llm.invoke([("system", system_prompt), ("user", req.message)])
+            if llm_res and getattr(llm_res, "content", None):
+                return {"success": True, "response": llm_res.content}
+        except Exception as e:
+            debug_log("B2", "api.py:agent_chat:llm_conversational_failed", str(e), {})
 
-        except Exception as tool_err:
-            # If tool calling fails (e.g. Scitely formatting error), fallback to direct chat
-            debug_log("B5", "api.py:agent_chat:tool_fallback", f"Tool calling failed: {str(tool_err)}", {})
-            response = llm.invoke([("user", req.message)])
-            answer = response.content
+    # Keyless / Fallback conversational responses
+    msg_lower = req.message.lower()
+    if "who are you" in msg_lower or "your name" in msg_lower or "introduce" in msg_lower or "purpose" in msg_lower:
+        response = (
+            "[SYSTEM PROFILE] Blue-Team Security Agent\n\n"
+            "I am **Cybersicker**, an elite AI-powered cybersecurity SOC agent designed by **Vrishin Ram K**.\n\n"
+            "My mission is to autonomously detect, investigate, and mitigate network threats in IoT environments by orchestrating threat intelligence and machine learning tools."
+        )
+    elif "what tools" in msg_lower or "available tools" in msg_lower or "capabilities" in msg_lower or "what can you do" in msg_lower or "tool list" in msg_lower:
+        response = (
+            "[SYSTEM CAPABILITIES] Operational Subsystems\n\n"
+            "I have 5 autonomous security tools at my disposal:\n"
+            "1. **Network Scanner**: Deep neural network autoencoder anomaly scan on logs.\n"
+            "2. **IP Check**: Threat intelligence lookup via VirusTotal API.\n"
+            "3. **MAC Lookup**: Resolves device manufacturer from MAC OUI.\n"
+            "4. **CVE Database**: NIST NVD vulnerability database query.\n"
+            "5. **Consult Playbook**: RAG-based ChromaDB query for incident response procedures.\n\n"
+            "*(You can also trigger these dynamically from the left deck or by typing any IP, CVE, or MAC address into the console!)*"
+        )
+    elif "hi" in msg_lower or "hello" in msg_lower or "hey" in msg_lower or "help" in msg_lower:
+        response = (
+            "[INITIALIZED] Cybersicker SOC Console v2.0\n\n"
+            "Hello! I am **Cybersicker**, your autonomous SOC analyst. How can I assist with your threat intelligence or anomaly detection operations today?\n\n"
+            "You can provide specific entities (e.g. *Analyze IP 8.8.8.8 and query CVE-2024-3094*) or click **Run Full-Spectrum Pipeline** to execute all vectors concurrently."
+        )
+    else:
+        response = (
+            "[OPERATOR DIRECTIVE] Cybersicker Autonomous Agent\n\n"
+            "I am ready to process your security instructions. You can input custom targets like:\n"
+            "- Specific IPs: *Analyze IP 8.8.8.8* or *Check 185.220.101.43*\n"
+            "- Vulnerability IDs: *Query CVE-2024-3094* or *Lookup CVE-2021-44228*\n"
+            "- Device MACs: *Resolve MAC 00:1A:2B:3C:4D:5E*\n"
+            "- Combined analysis: *Run full triage pipeline*"
+        )
 
-        return {"success": True, "response": answer}
-
-    except Exception as e:
-        debug_log("B2", "api.py:agent_chat:exception", "Agent execution failed", {
-            "error_type": type(e).__name__,
-            "error": str(e)[:300],
-        })
-        traceback.print_exc()
-        
-        # Fallback to Mock Agent (Sandbox Mode) if LLM provider fails
-        try:
-            debug_log("B6", "api.py:agent_chat:mock_fallback", "Attempting Mock Agent fallback after LLM failure", {})
-            
-            # Simple simulation logic based on keywords
-            msg = req.message.lower()
-            if "scan" in msg or "traffic" in msg:
-                response = (
-                    "[ANALYSIS] Local Assessment\n\n"
-                    "I've performed a simulated network scan on the requested logs.\n"
-                    "- **Status:** Completed (Simulated)\n"
-                    "- **Anomalies Detected:** 42\n"
-                    "- **Severity:** MONITORING\n"
-                    "- **Recommendation:** No critical threats found, but proceed with caution."
-                )
-            elif "who are you" in msg or "your name" in msg or "introduce" in msg or "purpose" in msg:
-                response = (
-                    "[SYSTEM PROFILE] Blue-Team Security Agent\n\n"
-                    "I am **Cybersicker**, an elite AI-powered cybersecurity SOC agent designed by **Vrishin Ram K**.\n\n"
-                    "My mission is to autonomously detect, investigate, and mitigate network threats in IoT environments by orchestrating threat intelligence and machine learning tools."
-                )
-            elif "what tools" in msg or "available tools" in msg or "capabilities" in msg or "what can you do" in msg or "tool list" in msg or "agent tools" in msg:
-                response = (
-                    "[SYSTEM CAPABILITIES] Operational Subsystems\n\n"
-                    "I have 5 autonomous security tools at my disposal:\n"
-                    "1. **Network Scanner**: Deep neural network autoencoder anomaly scan on logs.\n"
-                    "2. **IP Check**: Threat intelligence lookup via VirusTotal API.\n"
-                    "3. **MAC Lookup**: Resolves device manufacturer from MAC OUI.\n"
-                    "4. **CVE Database**: NIST NVD vulnerability database query.\n"
-                    "5. **Consult Playbook**: RAG-based ChromaDB query for incident response procedures.\n\n"
-                    "*(Note: You can trigger these tools dynamically by clicking them in the 'Agent Tools' panel on the left!)*"
-                )
-            elif "hi" in msg or "hello" in msg or "hey" in msg or "help" in msg:
-                response = (
-                    "[INITIALIZED] Cybersicker SOC Console v2.0\n\n"
-                    "Hello! I am **Cybersicker**, your autonomous SOC analyst. How can I assist with your threat intelligence or anomaly detection operations today?\n\n"
-                    "You can ask me to run tools (e.g. *\"Scan KDDTrain+.txt\"* or *\"Check IP 185.220.101.43\"*) or query general threat concepts."
-                )
-            elif "ip" in msg or "." in msg:
-                response = (
-                    "[ALERT] High Risk Threat Indicator\n\n"
-                    "I've simulated a VirusTotal investigation for the IP address mentioned.\n"
-                    "- **Verdict:** SUSPICIOUS\n"
-                    "- **Detection Ratio:** 4/72\n"
-                    "- **Note:** This IP has been associated with low-level scanning activity in Sandbox mode."
-                )
-            elif "mac" in msg or "device" in msg or "manufacturer" in msg or "oui" in msg:
-                response = (
-                    "[LOOKUP] Device OUI Resolution\n\n"
-                    "I've simulated a MAC lookup:\n"
-                    "- **OUI Vendor:** ASUS Tek Computer Inc.\n"
-                    "- **Verdict:** AUTHORIZED IoT device.\n"
-                    "- **Note:** Manufacturer recognized. Reference device inventory for asset verification."
-                )
-            elif "cve" in msg or "vuln" in msg or "database" in msg or "nist" in msg or "nvd" in msg:
-                response = (
-                    "[ADVISORY] NIST NVD Query Result\n\n"
-                    "I've simulated a CVE database search:\n"
-                    "- **Target Vulnerability:** CVE-2017-0144 (EternalBlue)\n"
-                    "- **CVSS Score:** 8.1 (HIGH)\n"
-                    "- **Description:** Remote Code Execution vulnerability in Microsoft SMBv1.\n"
-                    "- **Recommendation:** Block port 445 immediately and apply MS17-010 security update."
-                )
-            elif "playbook" in msg or "incident" in msg or "response" in msg or "mitigation" in msg:
-                response = (
-                    "[PLAYBOOK] Incident Response Directive\n\n"
-                    "I've queried the ChromaDB playbook database:\n"
-                    "- **Incident Type:** Ransomware Containment\n"
-                    "- **Containment Phase:** Isolate host from VLAN, block outbound port 445 and 139, disable SMBv1.\n"
-                    "- **Recovery Phase:** Verify backup integrity and perform bare-metal restore."
-                )
-            else:
-                response = (
-                    "[LOCAL MODE] Command Guidelines\n\n"
-                    "The primary LLM provider (Scitely/Gemini) is currently unavailable.\n"
-                    "I am operating in **Sandbox Mode**. I can still assist with general security questions and simulate tool usage.\n\n"
-                    "How can I help you today?"
-                )
-            return {"success": True, "response": response + "\n\n*(Note: Sandbox Fallback active due to provider error)*"}
-        except Exception as fallback_err:
-            return {"success": False, "response": f"Agent error: {str(e)} (Fallback also failed: {str(fallback_err)})"}
+    return {"success": True, "response": response}
 
 
 # ─── Health check ────────────────────────────────────────────
