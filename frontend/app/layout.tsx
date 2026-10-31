@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CYBERSICKER // SOC Dashboard",
+  title: "CYBERSICKER — IoT Anomaly Scanner & Threat Intelligence Console",
   description:
-    "Autonomous IoT Blue Team Agent — Threat Detection & Response System",
+    "Open-source blue-team console: Deep neural autoencoder anomaly scoring, live VirusTotal & NVD enrichment, and automated incident response.",
 };
 
 export default function RootLayout({
@@ -14,13 +14,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        suppressHydrationWarning
-        className="antialiased min-h-screen"
-      >
-      {/* Scan-line overlay */}
-        <div className="scanline-overlay" />
-      {children}
+      <body suppressHydrationWarning className="antialiased min-h-screen">
+        {children}
       </body>
     </html>
   );

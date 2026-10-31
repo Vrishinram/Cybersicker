@@ -1,37 +1,26 @@
 import streamlit as st
 import os
-import requests
 import datetime
-from langchain.agents import create_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.document_loaders import TextLoader
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_text_splitters import CharacterTextSplitter
-from langchain.tools import tool
-
-from autoencoder import run_network_scan
+import html
+import re
+import base64
 
 # ==========================================
-# 1. PAGE CONFIG & CUSTOM CSS
+# 1. PAGE CONFIG & MODERN HIGH-TECH THEME
 # ==========================================
 st.set_page_config(
-    page_title="CYBERSICKER // SOC",
-    page_icon="CS",
+    page_title="CYBERSICKER // Defense Console",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── Military-grade SOC Dark Theme CSS ──
 st.markdown("""
 <style>
-/* ═══════════ IMPORTS ═══════════ */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Orbitron:wght@500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap');
 
-/* ═══════════ HIDE STREAMLIT DEFAULTS ═══════════ */
-#MainMenu, header, footer, [data-testid="stToolbar"],
-[data-testid="stDecoration"], .stDeployButton {display: none !important;}
-/* Hide any Material Icon text that leaks into the sidebar */
+/* Hide default streamlit clutter */
+#MainMenu, header, footer, [data-testid="stToolbar"], [data-testid="stDecoration"], .stDeployButton {display: none !important;}
 section[data-testid="stSidebar"] .material-symbols-rounded,
 section[data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
 section[data-testid="stSidebar"] [data-testid="stSidebarNavSeparator"],
@@ -41,334 +30,204 @@ section[data-testid="stSidebar"] span.material-icons,
 section[data-testid="stSidebar"] [data-testid="stSidebarNavItems"],
 section[data-testid="stSidebar"] [data-testid="stLogo"],
 section[data-testid="stSidebar"] nav {display: none !important;}
-section[data-testid="stSidebarUserContent"] {margin-top: 0 !important; padding-top: 1rem !important;}
+section[data-testid="stSidebarUserContent"] {padding-top: 1.5rem !important;}
 
-/* ═══════════ ROOT VARIABLES ═══════════ */
 :root {
-    --bg-primary:   #0a0e17;
-    --bg-secondary: #0f1623;
-    --bg-card:      #111a2b;
-    --bg-input:     #0d1321;
-    --cyan:         #00f0ff;
-    --cyan-dim:     #00f0ff88;
-    --red:          #ff003c;
-    --red-dim:      #ff003c66;
-    --green:        #00ff88;
-    --amber:        #ffaa00;
-    --text:         #c8d6e5;
-    --text-muted:   #5c6b7e;
-    --border:       #1a2a44;
-    --glow-cyan:    0 0 15px #00f0ff33, 0 0 30px #00f0ff11;
-    --glow-red:     0 0 15px #ff003c33;
-    --font-mono:    'JetBrains Mono', monospace;
-    --font-display: 'Orbitron', sans-serif;
+    --bg-primary:   #0a0f1d;
+    --bg-secondary: #0f172a;
+    --bg-card:      #131c31;
+    --bg-input:     #0d1424;
+    --cyan:         #38bdf8;
+    --cyan-dim:     #0284c7;
+    --red:          #fda4af;
+    --red-bg:       #4c0519;
+    --green:        #a7f3d0;
+    --amber:        #fde68a;
+    --text:         #e2e8f0;
+    --text-muted:   #94a3b8;
+    --border:       #1e293b;
+    --border-light: #334155;
+    --font-body:    'IBM Plex Sans', sans-serif;
+    --font-mono:    'IBM Plex Mono', monospace;
+    --font-display: 'Space Grotesk', sans-serif;
 }
 
-/* ═══════════ GLOBAL ═══════════ */
 html, body, .stApp, [data-testid="stAppViewContainer"] {
     background-color: var(--bg-primary) !important;
     color: var(--text) !important;
-    font-family: var(--font-mono) !important;
+    font-family: var(--font-body) !important;
 }
-.stApp {background: var(--bg-primary) !important;}
-[data-testid="stAppViewBlockContainer"] {max-width: 1200px;}
 
-/* ═══════════ SIDEBAR ═══════════ */
+[data-testid="stAppViewBlockContainer"] {
+    max-width: 1600px;
+    padding-top: 1.5rem !important;
+    padding-bottom: 2rem !important;
+}
+
+/* Sidebar */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #070b14 0%, #0c1220 100%) !important;
+    background-color: #090e1a !important;
     border-right: 1px solid var(--border) !important;
 }
 section[data-testid="stSidebar"] * {
     color: var(--text) !important;
-    font-family: var(--font-mono) !important;
+    font-family: var(--font-body) !important;
 }
-section[data-testid="stSidebar"] .stMarkdown h1,
-section[data-testid="stSidebar"] .stMarkdown h2,
-section[data-testid="stSidebar"] .stMarkdown h3 {
-    color: var(--cyan) !important;
+section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
+    color: #f8fafc !important;
     font-family: var(--font-display) !important;
-    letter-spacing: 1px;
+    font-weight: 700;
 }
 
-/* ═══════════ INPUTS ═══════════ */
-input, textarea, .stTextInput input, .stTextArea textarea {
+/* Inputs */
+input, textarea, .stTextInput input, .stTextArea textarea, .stSelectbox [data-baseweb="select"] {
     background-color: var(--bg-input) !important;
-    color: var(--cyan) !important;
+    color: #f8fafc !important;
     border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-    font-family: var(--font-mono) !important;
-    transition: border-color 0.3s, box-shadow 0.3s;
+    border-radius: 6px !important;
+    font-family: var(--font-body) !important;
 }
 input:focus, textarea:focus, .stTextInput input:focus {
     border-color: var(--cyan) !important;
-    box-shadow: var(--glow-cyan) !important;
+    box-shadow: 0 0 0 1px var(--cyan) !important;
     outline: none !important;
 }
 
-/* ═══════════ CHAT INPUT BAR ═══════════ */
+/* Chat Input Bar */
 [data-testid="stChatInput"] {
-    background-color: var(--bg-secondary) !important;
+    background-color: #0b1120 !important;
     border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
+    border-radius: 8px !important;
 }
 [data-testid="stChatInput"]:focus-within {
     border-color: var(--cyan) !important;
-    box-shadow: var(--glow-cyan) !important;
+    box-shadow: 0 0 0 1px var(--cyan) !important;
 }
 [data-testid="stChatInput"] textarea {
     background: transparent !important;
     color: var(--text) !important;
+    font-family: var(--font-body) !important;
 }
 
-/* ═══════════ CHAT MESSAGES ═══════════ */
+/* Chat Messages */
 [data-testid="stChatMessage"] {
-    background: var(--bg-card) !important;
+    background: var(--bg-secondary) !important;
     border: 1px solid var(--border) !important;
-    border-radius: 10px !important;
+    border-radius: 8px !important;
     padding: 1rem !important;
-    margin-bottom: 0.5rem !important;
+    margin-bottom: 0.75rem !important;
 }
-[data-testid="stChatMessage"] p,
-[data-testid="stChatMessage"] li,
-[data-testid="stChatMessage"] span {
+[data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li {
     color: var(--text) !important;
+    font-size: 0.88rem;
+    line-height: 1.6;
 }
-[data-testid="stChatMessage"] strong {color: var(--cyan) !important;}
+[data-testid="stChatMessage"] strong {color: #f8fafc !important;}
 [data-testid="stChatMessage"] code {
-    background: #0d1321 !important;
-    color: var(--green) !important;
+    background: #080c14 !important;
+    color: var(--cyan) !important;
+    border: 1px solid #1a263d;
     border-radius: 4px; padding: 2px 6px;
+    font-family: var(--font-mono) !important;
+    font-size: 0.8rem;
 }
 
-/* ═══════════ METRIC CARDS ═══════════ */
+/* Metric Cards */
 [data-testid="stMetric"] {
-    background: var(--bg-card) !important;
+    background: var(--bg-secondary) !important;
     border: 1px solid var(--border) !important;
-    border-radius: 10px !important;
-    padding: 0.8rem 1.2rem !important;
-    transition: border-color 0.3s;
-}
-[data-testid="stMetric"]:hover {
-    border-color: var(--cyan) !important;
-    box-shadow: var(--glow-cyan) !important;
+    border-radius: 6px !important;
+    padding: 0.75rem 1rem !important;
 }
 [data-testid="stMetric"] label {
     color: var(--text-muted) !important;
     font-family: var(--font-mono) !important;
     text-transform: uppercase;
-    font-size: 0.7rem !important;
-    letter-spacing: 1.5px;
+    font-size: 0.65rem !important;
+    letter-spacing: 0.05em;
+    font-weight: 500;
 }
 [data-testid="stMetric"] [data-testid="stMetricValue"] {
-    color: var(--cyan) !important;
-    font-family: var(--font-display) !important;
-    font-weight: 700 !important;
-}
-
-/* ═══════════ EXPANDER ═══════════ */
-.streamlit-expanderHeader {
-    background: var(--bg-card) !important;
-    color: var(--cyan) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
+    color: #f8fafc !important;
     font-family: var(--font-mono) !important;
-}
-.streamlit-expanderContent {
-    background: var(--bg-secondary) !important;
-    border: 1px solid var(--border) !important;
-    border-top: none !important;
-    border-radius: 0 0 8px 8px !important;
+    font-weight: 700 !important;
+    font-size: 1.25rem !important;
 }
 
-/* ═══════════ STATUS / SPINNER ═══════════ */
-[data-testid="stStatusWidget"] {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--cyan-dim) !important;
-    border-radius: 10px !important;
-}
-[data-testid="stStatusWidget"] summary {color: var(--cyan) !important;}
-.stSpinner > div > span {color: var(--cyan) !important;}
-
-/* ═══════════ ALERTS ═══════════ */
-.stAlert [data-testid="stAlertContentError"] {
-    background: #1a0a12 !important;
-    border-color: var(--red) !important;
-    color: var(--red) !important;
-}
-
-/* ═══════════ SCROLLBAR ═══════════ */
-::-webkit-scrollbar {width: 6px;}
-::-webkit-scrollbar-track {background: var(--bg-primary);}
-::-webkit-scrollbar-thumb {background: var(--border); border-radius: 3px;}
-::-webkit-scrollbar-thumb:hover {background: var(--cyan-dim);}
-
-/* ═══════════ DIVIDER ═══════════ */
-hr {border-color: var(--border) !important; opacity: 0.4;}
-
-/* ═══════════ CUSTOM HEADER BOX ═══════════ */
+/* Custom Header */
 .soc-header {
-    background: linear-gradient(135deg, #0b1120 0%, #111e38 50%, #0b1120 100%);
+    background: #0f172a;
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1.5rem 2rem;
+    border-radius: 8px;
+    padding: 1.1rem 1.5rem;
     margin-bottom: 1rem;
-    position: relative;
-    overflow: hidden;
-}
-.soc-header::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    border-top: 2px solid var(--cyan-dim);
 }
 .soc-header h1 {
     font-family: var(--font-display) !important;
-    color: var(--cyan) !important;
-    font-size: 1.8rem;
-    margin: 0 0 0.25rem 0;
-    letter-spacing: 3px;
-    text-shadow: 0 0 20px #00f0ff44;
+    color: #f8fafc !important;
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 800;
+    letter-spacing: -0.02em;
 }
 .soc-header .subtitle {
     color: var(--text-muted);
-    font-size: 0.78rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-.soc-header .badge {
-    display: inline-block;
-    background: var(--red);
-    color: #fff;
-    font-size: 0.6rem;
-    padding: 2px 10px;
-    border-radius: 20px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    margin-left: 12px;
-    vertical-align: middle;
-    animation: pulse-badge 2s ease-in-out infinite;
-}
-@keyframes pulse-badge {
-    0%, 100% {box-shadow: 0 0 0 0 #ff003c55;}
-    50% {box-shadow: 0 0 12px 4px #ff003c44;}
-}
-
-/* ═══════════ SIDEBAR FOOTER ═══════════ */
-.sidebar-footer {
-    position: fixed;
-    bottom: 0;
-    width: inherit;
-    background: linear-gradient(180deg, transparent, #070b14);
-    padding: 1rem 1.5rem;
-    text-align: center;
-    border-top: 1px solid var(--border);
-}
-.sidebar-footer .uni-name {
-    color: var(--text-muted);
-    font-size: 0.58rem;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    line-height: 1.6;
-}
-.sidebar-footer .author {
-    color: var(--cyan-dim);
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     margin-top: 4px;
 }
-
-/* ═══════════ SCAN-LINE ANIMATION ═══════════ */
-.soc-header::after {
-    content: '';
-    position: absolute;
-    top: 0; left: -100%;
-    width: 100%; height: 100%;
-    background: linear-gradient(90deg, transparent, #00f0ff08, transparent);
-    animation: scanline 4s linear infinite;
+.soc-header .badge {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: var(--cyan);
+    font-size: 0.62rem;
+    font-family: var(--font-mono);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+    vertical-align: middle;
 }
-@keyframes scanline {
-    0% {left: -100%;}
-    100% {left: 100%;}
+
+/* Buttons */
+.stButton button {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.8rem !important;
+    border-radius: 6px !important;
+    transition: all 0.15s ease !important;
+}
+.stButton button:hover {
+    border-color: var(--cyan) !important;
+    color: #f8fafc !important;
+    background-color: #131d31 !important;
+}
+.stButton button[kind="primary"] {
+    background-color: var(--cyan-dim) !important;
+    color: #fff !important;
+    border-color: var(--cyan) !important;
+}
+
+/* Expanders */
+.streamlit-expanderHeader {
+    background: var(--bg-secondary) !important;
+    color: #f8fafc !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    font-size: 0.82rem !important;
+}
+.streamlit-expanderContent {
+    background: #090e1a !important;
+    border: 1px solid var(--border) !important;
+    border-top: none !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==========================================
-# 2. DASHBOARD HEADER
-# ==========================================
-import base64
-
-logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
-if os.path.exists(logo_path):
-    with open(logo_path, "rb") as f:
-        logo_b64 = base64.b64encode(f.read()).decode()
-    logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height:60px; vertical-align:middle; margin-right:16px; filter: drop-shadow(0 0 12px #00f0ff55);"/>'
-else:
-    logo_html = ''
-
-st.markdown(f"""
-<div class="soc-header">
-    <div style="display:flex; align-items:center;">
-      {logo_html}
-        <div>
-            <h1>CYBERSICKER<span class="badge">SOC ACTIVE</span></h1>
-            <div class="subtitle">Autonomous IoT Blue Team Agent &mdash; Threat Detection &amp; Response System</div>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# ── Live System Metrics ──
-now = datetime.datetime.now()
-m1, m2, m3, m4 = st.columns(4)
-with m1:
-    st.metric(label="System Status", value="ONLINE", delta="Nominal")
-with m2:
-    st.metric(label="IoT Sensors", value="ACTIVE", delta="All Connected")
-with m3:
-    st.metric(label="Threat Level", value="MONITORING", delta="Low")
-with m4:
-    st.metric(label="Uptime", value=now.strftime("%H:%M:%S"), delta=now.strftime("%Y-%m-%d"))
-
-
-# ==========================================
-# 3. SIDEBAR — CONFIGURATION PANEL
-# ==========================================
-# Keys loaded from environment variables
-google_key = os.environ.get("GOOGLE_API_KEY", "")
-vt_key = os.environ.get("VT_API_KEY", "")
-
-with st.sidebar:
-    if os.path.exists(logo_path):
-        st.image(logo_path, width="stretch")
-    st.markdown("### CONTROL PANEL")
-    st.markdown("---")
-
-    st.markdown("### 📡 Quick Commands")
-    st.code('Scan D:\\CYBERSICKER\\KDDTrain+.txt', language=None)
-    st.code('Check IP 185.220.101.43', language=None)
-    st.code('Consult playbook for IoT Anomalies', language=None)
-
-    # ── University badge footer ──
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align:center; padding: 0.5rem 0 2rem 0;">
-        <div style="color:#5c6b7e; font-size:0.55rem; letter-spacing:2px; text-transform:uppercase; line-height:1.8;">
-            🛡️ CYBERSICKER Threat Detection Suite
-        </div>
-        <div style="color:#00f0ff88; font-size:0.6rem; margin-top:6px; letter-spacing:1px;">
-            Built by <strong style="color:#00f0ff;">Vrishin Ram.K</strong>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ==========================================
-# 4. THE TOOLS (unchanged backend logic)
-# ==========================================
-# ==========================================
-# 4. UNIFIED SECURITY TOOLS (Shared with CLI & API)
+# 2. TOOLS & SECURITY HELPERS
 # ==========================================
 from tools import (
     ALL_TOOLS,
@@ -381,51 +240,6 @@ from tools import (
     escape_output,
 )
 
-
-
-# ==========================================
-# 5. SECURITY HARDENING & INPUT VALIDATION
-# ==========================================
-import re
-import html
-
-def sanitize_input(user_input: str, max_length: int = 1000) -> tuple[str, bool]:
-    """
-    Sanitize user input for security (Phase 4 Security Hardening).
-    Prevents prompt injection, SQL injection, command execution patterns.
-    Returns: (sanitized_text, is_valid)
-    """
-    if not user_input or len(user_input) == 0:
-        return "", False
-    
-    if len(user_input) > max_length:
-        return "", False
-    
-    sanitized = user_input.strip()
-    
-    # Detect prompt injection patterns
-    injection_patterns = [
-        r"ignore.*previous.*instructions",
-        r"system.*prompt",
-        r"execute.*code",
-        r"sql.*injection",
-        r"run.*command",
-    ]
-    
-    for pattern in injection_patterns:
-        if re.search(pattern, sanitized, re.IGNORECASE):
-            return "", False
-    
-    return sanitized, True
-
-def escape_output(text: str) -> str:
-    """Escape HTML special characters in output (Phase 4 Security Hardening)."""
-    return html.escape(text)
-
-
-# ==========================================
-# 5B. MITRE ATT&CK & CAPABILITY MATRIX
-# ==========================================
 MITRE_COVERAGE = {
     "T1010": {"name": "Automated Exfiltration", "component": "autoencoder.py", "mapped": True},
     "T1020": {"name": "Automated Exfiltration via IM", "component": "anomaly detection", "mapped": True},
@@ -435,128 +249,310 @@ MITRE_COVERAGE = {
     "T1040": {"name": "Network Sniffing", "component": "network_scanner", "mapped": True},
 }
 
-SKILL_MAPPINGS = {
-    "network_scanner": ["Threat Hunting (55)", "Network Security (40)", "Malware Analysis (39)"],
-    "check_ip_virustotal": ["Threat Intelligence (50)", "Incident Response (25)"],
-    "lookup_mac_address": ["Network Security (40)", "Digital Forensics (37)"],
-    "query_cve_database": ["Malware Analysis (39)", "Cloud Security (60)"],
-    "consult_playbook": ["Incident Response (25)", "Digital Forensics (37)"],
-}
-
 
 # ==========================================
-# 6. CAPABILITIES & THREAT MODEL DISPLAY
+# 3. SIDEBAR — CREDENTIALS & STATUS
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["🔒 Threat Guard", "📊 Capabilities", "⚔️ MITRE Coverage", "📋 STRIDE Model"]
-)
+with st.sidebar:
+    st.markdown("### CYBERSICKER // SOC")
+    st.caption("Autonomous Blue-Team Security Workbench")
+    st.markdown("---")
 
-with tab2:
-    st.markdown("### 🛡️ Cybersecurity Skill Mappings")
-    st.markdown("*Framework coverage for each detection component (Phases 1-3)*")
-    
-    cols = st.columns(2)
-    for idx, (tool_name, skills) in enumerate(SKILL_MAPPINGS.items()):
-        with cols[idx % 2]:
-            with st.container(border=True):
-                st.markdown(f"**{tool_name.replace('_', ' ').title()}**")
-                for skill in skills:
-                    st.markdown(f"📚 {skill}", help="From Anthropic-Cybersecurity-Skills")
+    st.markdown("#### System Credentials")
+    env_google_key = os.environ.get("GOOGLE_API_KEY", "")
+    env_vt_key = os.environ.get("VT_API_KEY", "")
 
-with tab3:
-    st.markdown("### ⚔️ MITRE ATT&CK Coverage (Phase 3)")
-    st.markdown(f"**Techniques Mapped: {sum(1 for v in MITRE_COVERAGE.values() if v['mapped'])}/{len(MITRE_COVERAGE)}**")
-    
-    coverage_data = [{
-        "ID": tid,
-        "Technique": details["name"],
-        "Component": details["component"],
-        "Status": "✅"
-    } for tid, details in MITRE_COVERAGE.items()]
-    
-    st.dataframe(coverage_data, use_container_width=True, hide_index=True)
+    google_key = st.text_input(
+        "Google Gemini API Key",
+        value=env_google_key,
+        type="password",
+        help="Enables autonomous multi-turn blue-team agent reasoning with Gemini 2.5 Flash."
+    )
+    vt_key = st.text_input(
+        "VirusTotal API Key",
+        value=env_vt_key,
+        type="password",
+        help="Enables real-time IP reputation lookups across 70+ threat intelligence engines."
+    )
 
-with tab4:
-    st.markdown("### 📋 STRIDE Threat Model (Phase 2)")
+    if vt_key:
+        os.environ["VT_API_KEY"] = vt_key
+    if google_key:
+        os.environ["GOOGLE_API_KEY"] = google_key
+
+    st.markdown("---")
+    st.markdown("#### Operational Subsystems")
+    st.markdown(f"**Anomaly Engine:** `Keras Dense Autoencoder`")
+    st.markdown(f"**Baseline Dataset:** `NSL-KDD (125,973 Records)`")
+    st.markdown(f"**Playbook RAG:** `ChromaDB (380 vectors)`")
+    st.markdown(f"**LLM Agent:** `{'Active (Gemini 2.5 Flash)' if google_key else 'Standby (Local Direct Tools)'}`")
+
+    st.markdown("---")
+    if st.button("Clear Incident Log", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
     st.markdown("""
-    **Threat Coverage:** All 6 STRIDE vectors × 4 components
-    
-    | Vector | Mitigation | Verified |
-    |--------|-----------|----------|
-    | **S**poofing | API key validation, OAuth | ✅ |
-    | **T**ampering | Model integrity, logging | ✅ |
-    | **R**epudiation | Audit trail, action log | ✅ |
-    | **I**nformation Disclosure | Output escaping, sanitization | ✅ |
-    | **D**enial of Service | Rate limiting, response caps | ✅ |
-    | **E**levation of Privilege | Least privilege tools | ✅ |
-    
-    **Frameworks:** NIST CSF 2.0, MITRE ATT&CK v18, NIST AI RMF 1.0
-    """)
+    <div style="font-size:0.65rem; color:#64748b; margin-top:2rem; line-height:1.5;">
+        CYBERSICKER Defense Platform v2.0<br/>
+        Engineered by <strong style="color:#94a3b8;">Vrishin Ram.K</strong>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ==========================================
-# 7. CHAT INTERFACE & AGENT EXECUTION
+# 4. DASHBOARD HEADER & TELEMETRY STRIP
 # ==========================================
-# Initialize chat history in Streamlit session
+logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+logo_html = ""
+if os.path.exists(logo_path):
+    with open(logo_path, "rb") as f:
+        logo_b64 = base64.b64encode(f.read()).decode()
+    logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height:44px; margin-right:12px;"/>'
+
+st.markdown(f"""
+<div class="soc-header">
+    <div style="display:flex; align-items:center;">
+        {logo_html}
+        <div>
+            <h1>CYBERSICKER<span class="badge">DEFENSE CONSOLE // v2.0</span></h1>
+            <div class="subtitle">Open-source blue-team workbench: Deep neural autoencoder anomaly scoring &amp; automated threat intelligence</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# 4-Column Live Metric Strip
+m1, m2, m3, m4 = st.columns(4)
+with m1:
+    st.metric(label="System Status", value="ONLINE", delta="Local Defense Kernel")
+with m2:
+    st.metric(label="Baseline Dataset", value="125,973", delta="NSL-KDD Network Records")
+with m3:
+    st.metric(label="Detection Engine", value="MSE > 0.042", delta="Keras Autoencoder")
+with m4:
+    agent_status = "READY" if google_key else "LOCAL ONLY"
+    st.metric(label="Threat Intel Agent", value=agent_status, delta="Gemini 2.5 Flash" if google_key else "Configure API Key")
+
+st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+
+# ==========================================
+# 5. ASYMMETRIC DUAL-PLANE WORKSPACE
+# ==========================================
+col_tools, col_console = st.columns([4, 6], gap="medium")
+
+# Initialize chat session
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous messages with custom avatars
-for msg in st.session_state.messages:
-    avatar = "🛡️" if msg["role"] == "assistant" else "👤"
-    with st.chat_message(msg["role"], avatar=avatar):
-        st.markdown(msg["content"])
 
-# User Input with Security Validation (Phase 4)
-if prompt := st.chat_input("Enter a command for Cybersicker..."):
-    # Sanitize input first
-    sanitized_prompt, is_valid = sanitize_input(prompt)
+def run_direct_tool(tool_name: str, param: str):
+    """Executes a tool directly and records the action into the incident log."""
+    st.session_state.messages.append({
+        "role": "user",
+        "content": f"[OPERATOR ACTION] Executed {tool_name} with parameter: `{param}`"
+    })
     
-    if not is_valid:
-        st.error("🚨 **SECURITY ALERT:** Input rejected. Check for prompt injection or length violations.")
-    elif not google_key or not vt_key:
-        st.error("🔐 **AUTHENTICATION REQUIRED** — Open the sidebar and enter both API keys under System Credentials.")
+    with st.spinner(f"Running {tool_name}..."):
+        try:
+            if tool_name == "network_scanner":
+                result = network_scanner.invoke({"filepath": param})
+            elif tool_name == "check_ip_virustotal":
+                result = check_ip_virustotal.invoke({"ip_address": param})
+            elif tool_name == "lookup_mac_address":
+                result = lookup_mac_address.invoke({"mac_address": param})
+            elif tool_name == "query_cve_database":
+                result = query_cve_database.invoke({"cve_id": param})
+            elif tool_name == "consult_playbook":
+                result = consult_playbook.invoke({"query": param})
+            else:
+                result = "Unknown tool"
+        except Exception as e:
+            result = f"Tool Execution Error: {str(e)}"
+
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": result
+    })
+    st.rerun()
+
+
+# ─── LEFT COLUMN: INVESTIGATIVE TOOL DECK ───
+with col_tools:
+    st.markdown("#### Investigative Tool Deck")
+    st.caption("Trigger automated blue-team scripts or run custom threat parameters.")
+
+    with st.container(border=True):
+        st.markdown("**1-Click Quick Triage Actions**")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Scan Traffic Dump", use_container_width=True, help="Evaluates KDDTrain+.txt with Keras autoencoder"):
+                run_direct_tool("network_scanner", r"D:\CYBERSICKER\KDDTrain+.txt")
+        with c2:
+            if st.button("Check IP 185.220.101.43", use_container_width=True, help="Queries VirusTotal for Tor exit node reputation"):
+                run_direct_tool("check_ip_virustotal", "185.220.101.43")
+
+        c3, c4 = st.columns(2)
+        with c3:
+            if st.button("Query CVE-2021-44228", use_container_width=True, help="Queries NIST NVD database for Log4Shell"):
+                run_direct_tool("query_cve_database", "CVE-2021-44228")
+        with c4:
+            if st.button("Lookup MAC Vendor", use_container_width=True, help="Resolves IEEE manufacturer OUI for 00:1A:2B:3C:4D:5E"):
+                run_direct_tool("lookup_mac_address", "00:1A:2B:3C:4D:5E")
+
+        if st.button("Consult Botnet Playbook", use_container_width=True, help="Queries ChromaDB incident response playbooks"):
+            run_direct_tool("consult_playbook", "Botnet containment and perimeter isolation")
+
+    # Custom Tool Parameter Form
+    with st.expander("Custom Tool Parameter Execution", expanded=False):
+        tool_choice = st.selectbox(
+            "Select Tool",
+            ["network_scanner", "check_ip_virustotal", "query_cve_database", "lookup_mac_address", "consult_playbook"],
+            format_func=lambda x: {
+                "network_scanner": "Network Traffic Anomaly Scanner (Autoencoder)",
+                "check_ip_virustotal": "VirusTotal IP Reputation Checker",
+                "query_cve_database": "NIST NVD CVE Vulnerability Database",
+                "lookup_mac_address": "IEEE MAC OUI Hardware Identifier",
+                "consult_playbook": "Incident Response Playbook (ChromaDB)",
+            }.get(x, x)
+        )
+
+        placeholders = {
+            "network_scanner": r"D:\CYBERSICKER\KDDTrain+.txt",
+            "check_ip_virustotal": "185.220.101.43",
+            "query_cve_database": "CVE-2021-44228",
+            "lookup_mac_address": "00:1A:2B:3C:4D:5E",
+            "consult_playbook": "IoT botnet infection containment steps",
+        }
+
+        custom_param = st.text_input("Parameter Value", value=placeholders.get(tool_choice, ""))
+        if st.button("Run Custom Analysis", type="primary", use_container_width=True):
+            if custom_param.strip():
+                run_direct_tool(tool_choice, custom_param.strip())
+
+    # MITRE ATT&CK & Defense Matrix Expander
+    with st.expander("MITRE ATT&CK & STRIDE Coverage", expanded=False):
+        st.markdown("**Mapped MITRE Techniques:**")
+        coverage_data = [{
+            "ID": tid,
+            "Technique": details["name"],
+            "Component": details["component"],
+            "Status": "MAPPED"
+        } for tid, details in MITRE_COVERAGE.items()]
+        st.dataframe(coverage_data, use_container_width=True, hide_index=True)
+
+        st.markdown("""
+        **STRIDE Threat Model:**
+        - **Spoofing:** API Key validation & OAuth
+        - **Tampering:** Model weight integrity & hash verification
+        - **Repudiation:** Append-only audit logging
+        - **Information Disclosure:** Strict output escaping
+        - **Denial of Service:** Rate-limited tool execution
+        - **Elevation of Privilege:** Least-privilege function sandboxing
+        """)
+
+
+# ─── RIGHT COLUMN: INCIDENT RESPONSE TERMINAL ───
+with col_console:
+    st.markdown("#### Incident Response Terminal")
+    st.caption("Conversational blue-team investigation, threat correlation, and containment.")
+
+    # Render previous messages
+    if len(st.session_state.messages) == 0:
+        with st.container(border=True):
+            st.markdown("""
+            **Session Initiated // No Active Alerts**
+            
+            Use the **1-Click Quick Triage Actions** on the left to immediately test anomaly detection, or type an investigative instruction into the console below.
+            
+            *Suggested queries:*
+            - `"Scan D:\\CYBERSICKER\\KDDTrain+.txt and report anomalies"`
+            - `"Investigate IP 185.220.101.43 using VirusTotal"`
+            - `"Provide containment steps for a Mirai botnet infection"`
+            """)
     else:
-        # Add user message to chat
-        st.session_state.messages.append({"role": "user", "content": sanitized_prompt})
-        with st.chat_message("user", avatar="👤"):
-            st.markdown(escape_output(sanitized_prompt))
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
-        # Generate agent response
-        with st.chat_message("assistant", avatar="🛡️"):
-            with st.status("🔒 Initializing Threat Intel Protocol...", expanded=True) as status:
-                try:
-                    status.update(label="🧠 Loading Gemini LLM...", state="running")
-                    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, api_key=google_key)
-                    tools = [network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook]
+    # Console Command Input
+    if prompt := st.chat_input("Enter an investigative instruction (e.g., 'Scan KDDTrain+.txt' or 'Analyze IP 185.220.101.43')..."):
+        sanitized_prompt, is_valid = sanitize_input(prompt)
+        
+        if not is_valid:
+            st.error("**SECURITY ALERT:** Input rejected. Check for command injection or length violations.")
+        else:
+            st.session_state.messages.append({"role": "user", "content": sanitized_prompt})
+            with st.chat_message("user"):
+                st.markdown(escape_output(sanitized_prompt))
 
-                    status.update(label="⚙️ Constructing Agent Graph...", state="running")
-                    agent = create_agent(
-                        llm,
-                        tools=tools,
-                        system_prompt="You are Cybersicker, an elite cybersecurity agent. Format your final answer neatly."
-                    )
+            with st.chat_message("assistant"):
+                # If Gemini API key is configured, run autonomous LangChain ReAct agent
+                if google_key:
+                    with st.status("Executing Blue-Team Investigation Protocol...", expanded=True) as status:
+                        try:
+                            from langchain.agents import create_agent
+                            from langchain_google_genai import ChatGoogleGenerativeAI
 
-                    status.update(label="📡 Executing Analysis — Tools Running...", state="running")
-                    response = agent.invoke({
-                        "messages": [("user", sanitized_prompt)]
-                    })
-                    
-                    final_content = response["messages"][-1].content
-                    if isinstance(final_content, list):
-                        answer = final_content[0]["text"]
-                    else:
-                        answer = final_content
+                            status.update(label="Connecting to Gemini 2.5 Flash...", state="running")
+                            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, api_key=google_key)
+                            tools = [network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook]
 
-                    status.update(label="✅ Analysis Complete", state="complete", expanded=False)
+                            status.update(label="Constructing LangChain ReAct Graph...", state="running")
+                            agent = create_agent(
+                                llm,
+                                tools=tools,
+                                system_prompt="You are Cybersicker, an automated blue-team SOC analyst. Triage threats using network anomaly scans, VirusTotal reputation checks, CVE queries, and incident response playbooks. Format your final report cleanly with actionable containment recommendations."
+                            )
 
-                except Exception as e:
-                    answer = None
-                    status.update(label="❌ Analysis Failed", state="error", expanded=False)
-                    st.error(f"**SYSTEM ERROR:** {str(e)}")
+                            status.update(label="Executing Analysis Tools...", state="running")
+                            response = agent.invoke({"messages": [("user", sanitized_prompt)]})
+                            
+                            final_content = response["messages"][-1].content
+                            answer = final_content[0]["text"] if isinstance(final_content, list) else final_content
+                            status.update(label="Investigation Complete", state="complete", expanded=False)
+                        except Exception as e:
+                            answer = f"Agent Investigation Error: {str(e)}"
+                            status.update(label="Investigation Encountered Error", state="error", expanded=False)
+                else:
+                    # Graceful Local Fallback: Execute appropriate tool based on user intent
+                    lower_prompt = sanitized_prompt.lower()
+                    with st.status("Executing Local Security Kernel (Local Mode)...", expanded=True) as status:
+                        if "scan" in lower_prompt or "kdd" in lower_prompt:
+                            status.update(label="Running Autoencoder Network Scan...", state="running")
+                            answer = network_scanner.invoke({"filepath": r"D:\CYBERSICKER\KDDTrain+.txt"})
+                        elif "ip" in lower_prompt or "virustotal" in lower_prompt:
+                            ip_match = re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", sanitized_prompt)
+                            target_ip = ip_match.group(0) if ip_match else "185.220.101.43"
+                            status.update(label=f"Querying VirusTotal for {target_ip}...", state="running")
+                            answer = check_ip_virustotal.invoke({"ip_address": target_ip})
+                        elif "cve" in lower_prompt:
+                            cve_match = re.search(r"cve-\d{4}-\d+", lower_prompt, re.IGNORECASE)
+                            target_cve = cve_match.group(0).upper() if cve_match else "CVE-2021-44228"
+                            status.update(label=f"Querying NIST NVD for {target_cve}...", state="running")
+                            answer = query_cve_database.invoke({"cve_id": target_cve})
+                        elif "mac" in lower_prompt or "oui" in lower_prompt or "hardware" in lower_prompt:
+                            mac_match = re.search(r"(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}", sanitized_prompt)
+                            target_mac = mac_match.group(0) if mac_match else "00:1A:2B:3C:4D:5E"
+                            status.update(label=f"Resolving MAC OUI for {target_mac}...", state="running")
+                            answer = lookup_mac_address.invoke({"mac_address": target_mac})
+                        elif "playbook" in lower_prompt or "containment" in lower_prompt or "response" in lower_prompt:
+                            status.update(label="Consulting Incident Response Playbook...", state="running")
+                            answer = consult_playbook.invoke({"query": sanitized_prompt})
+                        else:
+                            answer = (
+                                "[LOCAL MODE NOTE] Google API Key is not set in the sidebar for full conversational reasoning. "
+                                "However, you can directly run any tool above, or enter commands like:\n"
+                                "- `Scan D:\\CYBERSICKER\\KDDTrain+.txt`\n"
+                                "- `Check IP 185.220.101.43`\n"
+                                "- `Query CVE-2021-44228`\n"
+                                "- `Lookup MAC 00:1A:2B:3C:4D:5E`\n"
+                                "- `Consult playbook for botnet`"
+                            )
+                        status.update(label="Local Analysis Complete", state="complete", expanded=False)
 
-            if answer:
-                # Escape and display response (Phase 4 Security)
-                escaped_answer = escape_output(str(answer))
-                st.markdown(escaped_answer)
+                st.markdown(escape_output(str(answer)))
                 st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.rerun()

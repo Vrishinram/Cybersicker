@@ -76,6 +76,13 @@ class CVERequest(BaseModel):
 class PlaybookRequest(BaseModel):
     incident_type: str
 
+class FullTriageRequest(BaseModel):
+    filepath: Optional[str] = "D:\\CYBERSICKER\\KDDTrain+.txt"
+    ip_address: Optional[str] = "185.220.101.43"
+    mac_address: Optional[str] = "00:1A:2B:3C:4D:5E"
+    cve_id: Optional[str] = "CVE-2021-44228"
+    incident_type: Optional[str] = "Botnet infection containment and perimeter isolation"
+
 class ChatRequest(BaseModel):
     message: str
     history: list = []
@@ -363,6 +370,68 @@ async def consult_playbook(req: PlaybookRequest):
         return ToolResponse(success=False, result=f"Error: {str(e)}")
 
 
+
+
+# ═══════════════════════════════════════════════════════════════
+# TOOL COMBINED: Full-Spectrum Security Triage Pipeline
+# ═══════════════════════════════════════════════════════════════
+@app.post("/api/tools/full-triage", response_model=ToolResponse)
+async def full_triage(req: FullTriageRequest):
+    try:
+        # 1. Run Network Scanner
+        scan_resp = await network_scan(ScanRequest(filepath=req.filepath or "D:\\CYBERSICKER\\KDDTrain+.txt"))
+        scan_data = json.loads(scan_resp.result) if scan_resp.success else {"verdict": "ERROR", "error": scan_resp.result}
+
+        # 2. Run IP Check
+        ip_resp = await check_ip(IPRequest(ip_address=req.ip_address or "185.220.101.43"))
+        ip_data = json.loads(ip_resp.result) if ip_resp.success else {"verdict": "ERROR", "error": ip_resp.result}
+
+        # 3. Run CVE Lookup
+        cve_resp = await cve_lookup(CVERequest(cve_id=req.cve_id or "CVE-2021-44228"))
+        cve_data = json.loads(cve_resp.result) if cve_resp.success else {"found": False, "error": cve_resp.result}
+
+        # 4. Run MAC Lookup
+        mac_resp = await mac_lookup(MACRequest(mac_address=req.mac_address or "00:1A:2B:3C:4D:5E"))
+        mac_data = json.loads(mac_resp.result) if mac_resp.success else {"vendor": "ERROR", "error": mac_resp.result}
+
+        # 5. Run Playbook
+        playbook_file = Path(BASE_DIR) / "playbook.env.txt"
+        playbook_text = ""
+        if playbook_file.exists():
+            content = playbook_file.read_text(encoding="utf-8", errors="ignore")
+            paras = [p.strip() for p in content.split("\n\n") if p.strip()]
+            topic_words = (req.incident_type or "botnet").split()
+            matches = [p for p in paras if any(w.lower() in p.lower() for w in topic_words)]
+            playbook_text = "\n---\n".join(matches[:2]) if matches else paras[0]
+        else:
+            playbook_text = "Standard Containment Protocol: 1. Isolate device. 2. Block external IP. 3. Apply CVE patch."
+
+        # Compute overall severity
+        is_critical = (
+            scan_data.get("verdict") == "CRITICAL"
+            or ip_data.get("verdict") == "MALICIOUS"
+            or cve_data.get("severity") in ["CRITICAL", "HIGH"]
+        )
+
+        overall_verdict = "CRITICAL THREAT DETECTED" if is_critical else "NOMINAL / LOW RISK"
+
+        combined_result = {
+            "event": "FULL_TRIAGE_COMPLETE",
+            "verdict": "MALICIOUS" if is_critical else "CLEAN",
+            "overall_status": overall_verdict,
+            "scan": scan_data,
+            "ip": ip_data,
+            "mac": mac_data,
+            "cve": cve_data,
+            "playbook": {
+                "topic": req.incident_type or "Botnet containment",
+                "procedures": playbook_text
+            }
+        }
+        return ToolResponse(success=True, result=json.dumps(combined_result))
+    except Exception as e:
+        return ToolResponse(success=False, result=f"Full triage pipeline failed: {str(e)}")
+
 # ═══════════════════════════════════════════════════════════════
 # AGENT CHAT — LLM + Tools
 # ═══════════════════════════════════════════════════════════════
@@ -381,7 +450,7 @@ async def agent_chat(req: ChatRequest):
         return {
             "success": True,
             "response": (
-                "🛡️ **Cybersicker Sandbox Mode Active**\n\n"
+                "[STATUS] Cybersicker Local Mode Active\n\n"
                 "I am running in **Keyless Sandbox Mode**. I can assist with general cybersecurity inquiries, but my autonomous tool-calling capabilities are limited.\n\n"
                 "- **Available:** Network Scan (Simulated), IP Rep (Mock), CVE Query (Simulated)\n"
                 "- **Required:** Add a `GOOGLE_API_KEY` or `SCITELY_API_KEY` to `.env` for full autonomous power.\n\n"
@@ -457,6 +526,16 @@ async def agent_chat(req: ChatRequest):
             except Exception as e:
                 return f"Error: {str(e)}"
 
+        @tool
+        def run_full_spectrum_triage(filepath: str = "D:\\CYBERSICKER\\KDDTrain+.txt", ip_address: str = "185.220.101.43", cve_id: str = "CVE-2021-44228", mac_address: str = "00:1A:2B:3C:4D:5E", incident_type: str = "Botnet infection") -> str:
+            """Run all 5 security tools together in a unified multi-vector pipeline: autoencoder network scan, VirusTotal IP reputation, NIST NVD CVE query, MAC vendor lookup, and incident playbook consultation. Use this whenever asked to combine all tools, run all tools, or do full spectrum triage."""
+            res1 = network_scanner.invoke({"filepath": filepath})
+            res2 = check_ip_virustotal.invoke({"ip_address": ip_address})
+            res3 = query_cve_database.invoke({"cve_id": cve_id})
+            res4 = lookup_mac_address.invoke({"mac_address": mac_address})
+            res5 = consult_playbook_tool.invoke({"incident_type": incident_type})
+            return f"FULL-SPECTRUM TRIAGE REPORT:\n1. NETWORK SCAN:\n{res1}\n\n2. VIRUSTOTAL IP REPUTATION:\n{res2}\n\n3. NIST NVD CVE:\n{res3}\n\n4. DEVICE MAC OUI:\n{res4}\n\n5. PLAYBOOK PROCEDURES:\n{res5}"
+
         llm = None
         provider = "none"
         if GOOGLE_API_KEY:
@@ -495,7 +574,7 @@ async def agent_chat(req: ChatRequest):
 
         # LangChain Agents usually require a prompt template. 
         # We'll use a more direct approach if create_agent is missing or failing.
-        tools = [network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook_tool]
+        tools = [run_full_spectrum_triage, network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook_tool]
         
         try:
             # Try standard tool calling if supported by the LLM
@@ -551,7 +630,7 @@ async def agent_chat(req: ChatRequest):
             msg = req.message.lower()
             if "scan" in msg or "traffic" in msg:
                 response = (
-                    "🛡️ **Cybersicker Sandbox Analysis**\n\n"
+                    "[ANALYSIS] Local Assessment\n\n"
                     "I've performed a simulated network scan on the requested logs.\n"
                     "- **Status:** Completed (Simulated)\n"
                     "- **Anomalies Detected:** 42\n"
@@ -560,30 +639,30 @@ async def agent_chat(req: ChatRequest):
                 )
             elif "who are you" in msg or "your name" in msg or "introduce" in msg or "purpose" in msg:
                 response = (
-                    "🤖 **Agent Profile**\n\n"
+                    "[SYSTEM PROFILE] Blue-Team Security Agent\n\n"
                     "I am **Cybersicker**, an elite AI-powered cybersecurity SOC agent designed by **Vrishin Ram K**.\n\n"
                     "My mission is to autonomously detect, investigate, and mitigate network threats in IoT environments by orchestrating threat intelligence and machine learning tools."
                 )
             elif "what tools" in msg or "available tools" in msg or "capabilities" in msg or "what can you do" in msg or "tool list" in msg or "agent tools" in msg:
                 response = (
-                    "🛠️ **Agent Capabilities**\n\n"
+                    "[SYSTEM CAPABILITIES] Operational Subsystems\n\n"
                     "I have 5 autonomous security tools at my disposal:\n"
-                    "1. 🔎 **Network Scanner**: Deep neural network autoencoder anomaly scan on logs.\n"
-                    "2. 🛡️ **IP Check**: Threat intelligence lookup via VirusTotal API.\n"
-                    "3. 🌐 **MAC Lookup**: Resolves device manufacturer from MAC OUI.\n"
-                    "4. 🐛 **CVE Database**: NIST NVD vulnerability database query.\n"
-                    "5. 📚 **Consult Playbook**: RAG-based ChromaDB query for incident response procedures.\n\n"
+                    "1. **Network Scanner**: Deep neural network autoencoder anomaly scan on logs.\n"
+                    "2. **IP Check**: Threat intelligence lookup via VirusTotal API.\n"
+                    "3. **MAC Lookup**: Resolves device manufacturer from MAC OUI.\n"
+                    "4. **CVE Database**: NIST NVD vulnerability database query.\n"
+                    "5. **Consult Playbook**: RAG-based ChromaDB query for incident response procedures.\n\n"
                     "*(Note: You can trigger these tools dynamically by clicking them in the 'Agent Tools' panel on the left!)*"
                 )
             elif "hi" in msg or "hello" in msg or "hey" in msg or "help" in msg:
                 response = (
-                    "🛡️ **Welcome to Cybersicker SOC**\n\n"
+                    "[INITIALIZED] Cybersicker SOC Console v2.0\n\n"
                     "Hello! I am **Cybersicker**, your autonomous SOC analyst. How can I assist with your threat intelligence or anomaly detection operations today?\n\n"
                     "You can ask me to run tools (e.g. *\"Scan KDDTrain+.txt\"* or *\"Check IP 185.220.101.43\"*) or query general threat concepts."
                 )
             elif "ip" in msg or "." in msg:
                 response = (
-                    "🚨 **Cybersicker Sandbox Alert**\n\n"
+                    "[ALERT] High Risk Threat Indicator\n\n"
                     "I've simulated a VirusTotal investigation for the IP address mentioned.\n"
                     "- **Verdict:** SUSPICIOUS\n"
                     "- **Detection Ratio:** 4/72\n"
@@ -591,7 +670,7 @@ async def agent_chat(req: ChatRequest):
                 )
             elif "mac" in msg or "device" in msg or "manufacturer" in msg or "oui" in msg:
                 response = (
-                    "🌐 **Cybersicker Sandbox MAC Resolver**\n\n"
+                    "[LOOKUP] Device OUI Resolution\n\n"
                     "I've simulated a MAC lookup:\n"
                     "- **OUI Vendor:** ASUS Tek Computer Inc.\n"
                     "- **Verdict:** AUTHORIZED IoT device.\n"
@@ -599,7 +678,7 @@ async def agent_chat(req: ChatRequest):
                 )
             elif "cve" in msg or "vuln" in msg or "database" in msg or "nist" in msg or "nvd" in msg:
                 response = (
-                    "🐛 **Cybersicker Sandbox CVE Query**\n\n"
+                    "[ADVISORY] NIST NVD Query Result\n\n"
                     "I've simulated a CVE database search:\n"
                     "- **Target Vulnerability:** CVE-2017-0144 (EternalBlue)\n"
                     "- **CVSS Score:** 8.1 (HIGH)\n"
@@ -608,7 +687,7 @@ async def agent_chat(req: ChatRequest):
                 )
             elif "playbook" in msg or "incident" in msg or "response" in msg or "mitigation" in msg:
                 response = (
-                    "📚 **Cybersicker Sandbox Playbook Consult**\n\n"
+                    "[PLAYBOOK] Incident Response Directive\n\n"
                     "I've queried the ChromaDB playbook database:\n"
                     "- **Incident Type:** Ransomware Containment\n"
                     "- **Containment Phase:** Isolate host from VLAN, block outbound port 445 and 139, disable SMBv1.\n"
@@ -616,7 +695,7 @@ async def agent_chat(req: ChatRequest):
                 )
             else:
                 response = (
-                    "🛡️ **Cybersicker Sandbox Mode**\n\n"
+                    "[LOCAL MODE] Command Guidelines\n\n"
                     "The primary LLM provider (Scitely/Gemini) is currently unavailable.\n"
                     "I am operating in **Sandbox Mode**. I can still assist with general security questions and simulate tool usage.\n\n"
                     "How can I help you today?"

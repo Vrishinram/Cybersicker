@@ -167,21 +167,28 @@ def analyze_network_data(
     pca_path = MODEL_DIR / "pca.joblib"
     meta_path = MODEL_DIR / "metadata.json"
 
-    if (
+    can_reuse = (
         not retrain
         and model_path.exists()
         and scaler_path.exists()
         and pca_path.exists()
-    ):
-        logger.info("Loading persisted autoencoder, scaler, and PCA from %s", MODEL_DIR)
-        model = load_model(model_path) if HAS_TF else joblib.load(model_path)
-        scaler: StandardScaler = joblib.load(scaler_path)
-        pca: PCA = joblib.load(pca_path)
-        scaled = scaler.transform(numeric_data)
-        reduced = pca.transform(scaled)
-        input_dim = reduced.shape[1]
-        trained = False
-    else:
+    )
+    if can_reuse:
+        try:
+            scaler: StandardScaler = joblib.load(scaler_path)
+            if getattr(scaler, "n_features_in_", None) == numeric_data.shape[1]:
+                model = load_model(model_path) if HAS_TF else joblib.load(model_path)
+                pca: PCA = joblib.load(pca_path)
+                scaled = scaler.transform(numeric_data)
+                reduced = pca.transform(scaled)
+                input_dim = reduced.shape[1]
+                trained = False
+            else:
+                can_reuse = False
+        except Exception:
+            can_reuse = False
+
+    if not can_reuse:
         logger.info("Fitting scaler, PCA, and training autoencoder...")
         scaler = StandardScaler()
         scaled = scaler.fit_transform(numeric_data)
