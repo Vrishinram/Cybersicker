@@ -270,3 +270,4 @@ class VirusTotalClient:
 
 # Global singleton instance
 virustotal_service = VirusTotalClient()
+

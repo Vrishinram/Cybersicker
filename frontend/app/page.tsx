@@ -366,8 +366,8 @@ export default function Dashboard() {
       {/* ═══════════ 2. APP HEADER ═══════════ */}
       <header className="border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3.5">
-          <div className="w-9 h-9 rounded-md bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0">
-            <Shield className="w-5 h-5 text-[var(--accent-light)]" />
+          <div className="h-9 px-2 rounded-md bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0">
+            <img src="/logo.png" alt="Cybersicker Logo" className="h-6 w-auto object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-2.5">
@@ -630,7 +630,7 @@ export default function Dashboard() {
           {/* Console Header */}
           <div className="px-5 py-3.5 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0 bg-[#0c1220]">
             <div className="flex items-center gap-3">
-              <Shield className="w-4 h-4 text-[var(--accent-light)]" />
+              <img src="/logo.png" alt="Cybersicker Agent" className="h-5 w-auto object-contain" />
               <div>
                 <h2 className="font-heading font-bold text-xs text-[var(--text-high)] uppercase tracking-wider">
                   Blue-Team Autonomous Agent
@@ -733,7 +733,7 @@ export default function Dashboard() {
                         </>
                       ) : (
                         <>
-                          <Shield className="w-3.5 h-3.5 text-[var(--accent-light)]" />
+                          <img src="/logo.png" alt="Cybersicker Agent" className="w-3.5 h-3.5 object-contain" />
                           <span>BLUE-TEAM AGENT</span>
                         </>
                       )}
@@ -770,20 +770,26 @@ export default function Dashboard() {
 
           {/* Console Command Input Bar */}
           <div className="p-4 border-t border-[var(--border-subtle)] bg-[#090e1a]">
-            <div className={`flex gap-2 ${inputError ? "animate-error-shake" : ""}`}>
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="Enter an investigative instruction (e.g., 'Scan KDDTrain+.txt' or 'Analyze IP 185.220.101.43')..."
-                className="input-field flex-1"
-                disabled={chatLoading}
-              />
+            <div className={`flex gap-2.5 items-center ${inputError ? "animate-error-shake" : ""}`}>
+              <div className="relative flex-1 flex items-center">
+                <div className="absolute left-3.5 flex items-center gap-2 pointer-events-none z-10">
+                  <img src="/logo.png" alt="Cybersicker Input" className="h-4.5 w-auto object-contain opacity-90" />
+                  <span className="text-[var(--text-muted)]/40 font-mono text-xs">|</span>
+                </div>
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                  placeholder="Enter an investigative instruction (e.g., 'Scan KDDTrain+.txt' or 'Analyze IP 185.220.101.43')..."
+                  className="input-field flex-1 pl-14 py-2.5"
+                  disabled={chatLoading}
+                />
+              </div>
               <button
                 onClick={() => handleSend()}
                 disabled={chatLoading || !inputValue.trim()}
-                className="btn-primary"
+                className="btn-primary flex items-center gap-2 px-5 py-2.5 shrink-0"
               >
                 {chatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 <span>Investigate</span>
@@ -816,17 +822,22 @@ export default function Dashboard() {
             <label className="block font-mono text-[0.68rem] text-[var(--text-muted)] uppercase mb-1.5">
               Input Parameter:
             </label>
-            <input
-              type="text"
-              autoFocus
-              value={modalInput}
-              onChange={(e) => setModalInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && modalInput.trim()) runTool(activeModal, modalInput.trim());
-              }}
-              placeholder={activeModal.placeholder}
-              className="input-field mb-5"
-            />
+            <div className="relative flex items-center mb-5">
+              <div className="absolute left-3 flex items-center pointer-events-none z-10">
+                <img src="/logo.png" alt="Cybersicker" className="h-4 w-auto object-contain opacity-80" />
+              </div>
+              <input
+                type="text"
+                autoFocus
+                value={modalInput}
+                onChange={(e) => setModalInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && modalInput.trim()) runTool(activeModal, modalInput.trim());
+                }}
+                placeholder={activeModal.placeholder}
+                className="input-field w-full pl-11"
+              />
+            </div>
 
             <div className="flex justify-end gap-2.5">
               <button

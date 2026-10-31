@@ -308,3 +308,4 @@ class OUIResolver:
 
 # Global singleton instance
 oui_service = OUIResolver()
+

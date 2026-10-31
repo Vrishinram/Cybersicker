@@ -251,3 +251,4 @@ class NVDClient:
 
 # Global singleton instance
 nvd_service = NVDClient()
+
