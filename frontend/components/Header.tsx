@@ -7,12 +7,14 @@ interface HeaderProps {
   apiStatus: "online" | "offline" | "checking";
   uptime: { h: number; m: number; s: number };
   onResetSession: () => void;
+  modelName?: string;
 }
 
 export default function Header({
   apiStatus,
   uptime,
   onResetSession,
+  modelName = "OLLAMA (LLAMA3.2)",
 }: HeaderProps) {
   const pad = (n: number) => n.toString().padStart(2, "0");
 
@@ -61,7 +63,7 @@ export default function Header({
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-light)]" />
-            <span className="text-[var(--text-muted)]">GEMINI 2.5 FLASH</span>
+            <span className="text-[var(--text-muted)] uppercase tracking-wider">{modelName}</span>
           </div>
         </div>
 

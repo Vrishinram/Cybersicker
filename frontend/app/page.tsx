@@ -96,6 +96,7 @@ export default function Home() {
   const [modalInput, setModalInput] = useState("");
   const [threatLevel, setThreatLevel] = useState<"LOW" | "MONITORING" | "HIGH">("MONITORING");
   const [apiStatus, setApiStatus] = useState<"online" | "offline" | "checking">("checking");
+  const [modelName, setModelName] = useState<string>("OLLAMA (LLAMA3.2)");
   const [inputError, setInputError] = useState(false);
   const [blockedIps, setBlockedIps] = useState<Set<string>>(new Set());
   const [fileUploadLoading, setFileUploadLoading] = useState(false);
@@ -136,7 +137,13 @@ export default function Home() {
       try {
         const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) });
         if (res.ok) {
+          const data = await res.json();
           setApiStatus("online");
+          if (data.llm_provider === "ollama") {
+            setModelName(`OLLAMA (${(data.ollama_model || "llama3.2").toUpperCase()})`);
+          } else if (data.google_key_set) {
+            setModelName("GEMINI 2.5 FLASH");
+          }
           addLog("info", '{"event":"BACKEND_CONNECTED","endpoint":"/health","status":"ONLINE"}');
         } else {
           setApiStatus("offline");
@@ -606,6 +613,7 @@ ${
         apiStatus={apiStatus}
         uptime={uptime}
         onResetSession={resetSession}
+        modelName={modelName}
       />
 
       {/* ═══════════ 3. INTEGRATED TELEMETRY BAR ═══════════ */}

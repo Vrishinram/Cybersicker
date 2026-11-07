@@ -20,3 +20,4 @@ def test_health_reports_ollama():
 def test_build_soc_agent_ollama():
     agent = build_soc_agent(provider="ollama", model="llama3.2")
     assert agent is not None
+
