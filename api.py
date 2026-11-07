@@ -292,6 +292,9 @@ async def health():
     return {
         "status": "online",
         "version": "2.5.0",
+        "llm_provider": os.getenv("LLM_PROVIDER", "ollama"),
+        "ollama_model": os.getenv("OLLAMA_MODEL", "llama3.2"),
+        "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
         "google_key_set": bool(os.getenv("GOOGLE_API_KEY")),
         "vt_key_set": bool(os.getenv("VT_API_KEY")),
         "nvd_key_set": bool(os.getenv("NVD_API_KEY")),

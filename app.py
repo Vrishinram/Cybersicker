@@ -258,34 +258,59 @@ with st.sidebar:
     st.caption("Autonomous Blue-Team Security Workbench")
     st.markdown("---")
 
-    st.markdown("#### System Credentials")
-    env_google_key = os.environ.get("GOOGLE_API_KEY", "")
-    env_vt_key = os.environ.get("VT_API_KEY", "")
-
-    google_key = st.text_input(
-        "Google Gemini API Key",
-        value=env_google_key,
-        type="password",
-        help="Enables autonomous multi-turn blue-team agent reasoning with Gemini 2.5 Flash."
+    st.markdown("#### LLM Engine & Credentials")
+    provider = st.selectbox(
+        "LLM Provider",
+        ["Ollama (Local LLM)", "Google Gemini"],
+        index=0,
+        help="Select between local private Ollama inference or Google Gemini cloud API."
     )
+    
+    if provider == "Ollama (Local LLM)":
+        ollama_model = st.selectbox(
+            "Ollama Model",
+            ["llama3.2", "qwen2.5:7b", "llama3.1", "mistral"],
+            index=0,
+            help="Select the local model running in your Ollama service."
+        )
+        ollama_host = st.text_input(
+            "Ollama Host URL",
+            value=os.environ.get("OLLAMA_HOST", "http://localhost:11434"),
+            help="Ollama API base endpoint (default: http://localhost:11434)."
+        )
+        os.environ["LLM_PROVIDER"] = "ollama"
+        os.environ["OLLAMA_MODEL"] = ollama_model
+        os.environ["OLLAMA_HOST"] = ollama_host
+        google_key = ""
+    else:
+        env_google_key = os.environ.get("GOOGLE_API_KEY", "")
+        google_key = st.text_input(
+            "Google Gemini API Key",
+            value=env_google_key,
+            type="password",
+            help="Enables autonomous multi-turn blue-team agent reasoning with Gemini 2.5 Flash."
+        )
+        if google_key:
+            os.environ["GOOGLE_API_KEY"] = google_key
+            os.environ["LLM_PROVIDER"] = "gemini"
+
+    env_vt_key = os.environ.get("VT_API_KEY", "")
     vt_key = st.text_input(
         "VirusTotal API Key",
         value=env_vt_key,
         type="password",
         help="Enables real-time IP reputation lookups across 70+ threat intelligence engines."
     )
-
     if vt_key:
         os.environ["VT_API_KEY"] = vt_key
-    if google_key:
-        os.environ["GOOGLE_API_KEY"] = google_key
 
     st.markdown("---")
     st.markdown("#### Operational Subsystems")
     st.markdown(f"**Anomaly Engine:** `Keras Dense Autoencoder`")
     st.markdown(f"**Baseline Dataset:** `NSL-KDD (125,973 Records)`")
     st.markdown(f"**Playbook RAG:** `ChromaDB (380 vectors)`")
-    st.markdown(f"**LLM Agent:** `{'Active (Gemini 2.5 Flash)' if google_key else 'Standby (Local Direct Tools)'}`")
+    active_agent_desc = f"Active (Ollama: {ollama_model})" if provider.startswith("Ollama") else ('Active (Gemini 2.5 Flash)' if google_key else 'Standby (Local Direct Tools)')
+    st.markdown(f"**LLM Agent:** `{active_agent_desc}`")
 
     st.markdown("---")
     if st.button("Clear Incident Log", use_container_width=True):
@@ -331,8 +356,10 @@ with m2:
 with m3:
     st.metric(label="Detection Engine", value="MSE > 0.042", delta="Keras Autoencoder")
 with m4:
-    agent_status = "READY" if google_key else "LOCAL ONLY"
-    st.metric(label="Threat Intel Agent", value=agent_status, delta="Gemini 2.5 Flash" if google_key else "Configure API Key")
+    is_ready = provider.startswith("Ollama") or bool(google_key)
+    agent_status = "ONLINE" if is_ready else "LOCAL ONLY"
+    agent_delta = f"Ollama ({ollama_model})" if provider.startswith("Ollama") else ("Gemini 2.5 Flash" if google_key else "Configure API Key")
+    st.metric(label="Threat Intel Agent", value=agent_status, delta=agent_delta)
 
 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
@@ -489,16 +516,22 @@ with col_console:
                 st.markdown(escape_output(sanitized_prompt))
 
             with st.chat_message("assistant"):
-                # If Gemini API key is configured, run autonomous LangChain ReAct agent
-                if google_key:
+                # Autonomous LangChain ReAct agent via Ollama or Gemini
+                use_llm = provider.startswith("Ollama") or bool(google_key)
+                if use_llm:
                     with st.status("Executing Blue-Team Investigation Protocol...", expanded=True) as status:
                         try:
                             from langchain.agents import create_agent
-                            from langchain_google_genai import ChatGoogleGenerativeAI
-
-                            status.update(label="Connecting to Gemini 2.5 Flash...", state="running")
-                            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, api_key=google_key)
                             tools = [network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook]
+
+                            if provider.startswith("Ollama"):
+                                from langchain_ollama import ChatOllama
+                                status.update(label=f"Connecting to Ollama ({ollama_model})...", state="running")
+                                llm = ChatOllama(model=ollama_model, base_url=ollama_host, temperature=0)
+                            else:
+                                from langchain_google_genai import ChatGoogleGenerativeAI
+                                status.update(label="Connecting to Gemini 2.5 Flash...", state="running")
+                                llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, api_key=google_key)
 
                             status.update(label="Constructing LangChain ReAct Graph...", state="running")
                             agent = create_agent(

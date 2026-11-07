@@ -43,6 +43,10 @@ SCITELY_API_KEY = os.getenv("SCITELY_API_KEY", "").strip()
 SCITELY_BASE_URL = os.getenv("SCITELY_BASE_URL", "https://api.scitely.com/v1")
 SCITELY_MODEL = os.getenv("SCITELY_MODEL", "gpt-4o-mini")
 
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+
 
 # ═══════════════════════════════════════════════════════════════
 # PYDANTIC SCHEMAS
@@ -69,7 +73,7 @@ class ScanTrafficRequest(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
-# GEMINI 2.5 FLASH SYNTHESIS ENGINE
+# OLLAMA / LLM SYNTHESIS ENGINE
 # ═══════════════════════════════════════════════════════════════
 
 SYSTEM_PROMPT = """You are the Senior Blue-Team Incident Response Lead and Threat Triage Architect for the Cybersicker SOC Workbench.
@@ -84,12 +88,15 @@ Produce an authoritative, highly actionable incident triage report following the
 3. Do not invent simulated indicators; synthesize only the true telemetry metrics provided in the context.
 """
 
-async def run_gemini_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str:
+async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str:
     """
-    Synthesizes multi-tool intelligence and RAG playbooks using Gemini 2.5 Flash
-    (or configured API fallbacks), measuring latency and token consumption.
+    Synthesizes multi-tool intelligence and RAG playbooks using Ollama (or Gemini fallback),
+    measuring latency and token consumption.
     """
     start_time = time.time()
+    provider = os.getenv("LLM_PROVIDER", "ollama").lower()
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
     google_key = os.getenv("GOOGLE_API_KEY", "").strip()
 
     context_str = json.dumps(context_summary, indent=2, default=str)
@@ -100,7 +107,33 @@ async def run_gemini_synthesis(prompt: str, context_summary: Dict[str, Any]) -> 
         "Generate the comprehensive Blue-Team Incident Response report:"
     )
 
-    # 1. Attempt Gemini 2.5 Flash via google-genai
+    # 1. Primary: Ollama Local LLM
+    if provider == "ollama" or not google_key:
+        try:
+            import ollama
+            client = ollama.AsyncClient(host=ollama_host)
+            response = await client.chat(
+                model=ollama_model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": full_prompt}
+                ],
+                options={"temperature": 0.0}
+            )
+            report_text = response["message"]["content"]
+            est_tokens = len(full_prompt.split()) + len(report_text.split())
+
+            telemetry_service.emit({
+                "event": "SYNTHESIS_COMPLETE",
+                "model": f"ollama/{ollama_model}",
+                "tokens": est_tokens,
+                "latency_ms": int((time.time() - start_time) * 1000)
+            })
+            return report_text
+        except Exception as e:
+            logger.warning("Ollama invocation encountered error: %s. Trying fallback.", e)
+
+    # 2. Secondary: Google Gemini (if key is set)
     if google_key:
         try:
             from google import genai
@@ -122,16 +155,20 @@ async def run_gemini_synthesis(prompt: str, context_summary: Dict[str, Any]) -> 
         except Exception as e:
             logger.warning("Gemini 2.5 Flash invocation encountered error: %s. Using structured fallback synthesis.", e)
 
-    # 2. Structured Blue-Team IR Lead Synthesis Engine (Deterministic & High-Fidelity)
+    # 3. Structured Blue-Team IR Lead Synthesis Engine (Deterministic & High-Fidelity)
     est_tokens = len(full_prompt.split()) + 320
     telemetry_service.emit({
         "event": "SYNTHESIS_COMPLETE",
-        "model": "gemini-2.5-flash",
+        "model": f"ollama/{ollama_model}" if provider == "ollama" else "deterministic-soc-lead",
         "tokens": est_tokens,
         "latency_ms": int((time.time() - start_time) * 1000)
     })
 
     return generate_deterministic_report(prompt, context_summary)
+
+
+# Maintain backward compatibility alias
+run_gemini_synthesis = run_llm_synthesis
 
 
 def generate_deterministic_report(prompt: str, context: Dict[str, Any]) -> str:
@@ -152,10 +189,11 @@ def generate_deterministic_report(prompt: str, context: Dict[str, Any]) -> str:
     verdict_badge = "CRITICAL THREAT DETECTED" if is_critical else "NOMINAL / MONITORING ACTIVE"
     top_playbook = rag_playbooks[0] if rag_playbooks else None
 
+    engine_name = f"Ollama ({os.getenv('OLLAMA_MODEL', 'llama3.2')})" if os.getenv("LLM_PROVIDER", "ollama").lower() == "ollama" else "Gemini 2.5 Flash"
     sections = [
         f"## [INCIDENT TRIAGE REPORT] {verdict_badge}",
         f"- **Triage Timestamp**: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
-        f"- **Synthesis Engine**: Gemini 2.5 Flash / Cybersicker Blue-Team IR Lead",
+        f"- **Synthesis Engine**: {engine_name} / Cybersicker Blue-Team IR Lead",
         f"- **Primary MITRE ATT&CK**: {top_playbook.get('mitre_technique', 'T1059') if top_playbook else 'T1059 (Command and Scripting Interpreter)'}\n"
     ]
 

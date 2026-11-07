@@ -15,12 +15,12 @@
 
 ## System Overview
 
-CYBERSICKER is an enterprise-grade autonomous Blue-Team Security Operations Center (SOC) workbench. It unifies a deep neural autoencoder for real-time network flow anomaly scoring with an autonomous LLM agent (Google Gemini 2.5 Flash) orchestrating multi-vector threat enrichment and active defense containment.
+CYBERSICKER is an enterprise-grade autonomous Blue-Team Security Operations Center (SOC) workbench. It unifies a deep neural autoencoder for real-time network flow anomaly scoring with an autonomous LLM agent (Ollama / Google Gemini) orchestrating multi-vector threat enrichment and active defense containment.
 
 ### Dual-Core Architecture
 
 1. **Agentic Reasoning & Triage Core:**
-   - **Orchestration LLM:** Google Gemini 2.5 Flash via LangChain and custom multi-intent dispatch pipelines.
+   - **Orchestration LLM:** Local private inference via **Ollama** (`llama3.2`, `qwen2.5:7b`, `llama3.1`) or cloud **Google Gemini 2.5 Flash** via LangChain.
    - **Strict Entity Validation:** Zero-fallback RFC 791 IPv4 boundary parsing, case-insensitive CVE extraction, and IEEE MAC OUI prefix resolution.
    - **Live External Threat Intelligence:** Async HTTP clients querying VirusTotal v3, NIST NVD REST API 2.0, and IEEE OUI databases without simulated fallbacks.
    - **Autonomous Playbook RAG:** Persistent ChromaDB vector database housing MITRE ATT&CK v18-aligned Standard Operating Procedures (`SOP-001` through `SOP-007`).
@@ -63,7 +63,7 @@ CYBERSICKER is an enterprise-grade autonomous Blue-Team Security Operations Cent
          |                 |                                 |                 |
          v                 v                                 v                 v
 +-----------------+ +-------------------+             +---------------+ +------------------+
-| Gemini 2.5 LLM  | | Live Threat Intel |             | Autoencoder   | | ChromaDB RAG     |
+| Ollama / Gemini | | Live Threat Intel |             | Autoencoder   | | ChromaDB RAG     |
 | Multi-Intent    | | - VirusTotal v3   |             | - Keras Model | | - MITRE ATT&CK   |
 | Tool Dispatcher | | - NIST NVD 2.0    |             | - Scapy PCAP  | | - SOP Playbooks  |
 |                 | | - IEEE OUI Lookup |             | - MSE > 0.042 | |   (001 - 007)    |
@@ -155,7 +155,10 @@ source venv/bin/activate     # Linux / macOS
 pip install -r requirements.txt
 
 # Configure environment variables (.env)
-GOOGLE_API_KEY=your_gemini_api_key_here
+LLM_PROVIDER=ollama
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+GOOGLE_API_KEY=your_gemini_api_key_here        # Optional fallback
 VT_API_KEY=your_virustotal_api_key_here        # Optional
 NVD_API_KEY=your_nvd_api_key_here              # Optional
 ```
@@ -231,7 +234,7 @@ Accepts multipart file upload (`.pcap`, `.pcapng`, `.csv`) or JSON payload. Reco
 ### 2. Autonomous Incident Triage
 
 #### `POST /api/chat`
-Dispatches operator natural language prompts to Google Gemini 2.5 Flash, dynamically invoking tools based on detected entities.
+Dispatches operator natural language prompts to Ollama (or Gemini fallback), dynamically invoking tools based on detected entities.
 
 **Example Request:**
 ```json
