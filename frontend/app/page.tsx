@@ -340,17 +340,16 @@ export default function Home() {
 #### Neural Model Metrics (Keras Autoencoder):
 - **Reconstruction MSE:** Mean: \`${d.mean_mse ?? 0.0512}\` | Max: \`${maxMse}\` | Threshold: \`${d.threshold ?? 0.042}\`
 - **Assessment Verdict:** **${d.verdict || (anomalies > 0 ? "MALICIOUS" : "CLEAN")}**
-${
-  d.top_anomalous_endpoints?.length
-    ? `\n#### Top Anomalous Flow Endpoints:\n${d.top_anomalous_endpoints
-        .slice(0, 5)
-        .map(
-          (ep: any) =>
-            `- \`${ep.flow_id || `${ep.src_ip}:${ep.src_port}->${ep.dst_ip}:${ep.dst_port}`}\` | MSE: \`${ep.mse}\``
-        )
-        .join("\n")}`
-    : ""
-}`;
+${d.top_anomalous_endpoints?.length
+            ? `\n#### Top Anomalous Flow Endpoints:\n${d.top_anomalous_endpoints
+              .slice(0, 5)
+              .map(
+                (ep: any) =>
+                  `- \`${ep.flow_id || `${ep.src_ip}:${ep.src_port}->${ep.dst_ip}:${ep.dst_port}`}\` | MSE: \`${ep.mse}\``
+              )
+              .join("\n")}`
+            : ""
+          }`;
 
         // Replace the parsing badge with the final summary card
         setMessages((prev) => {
