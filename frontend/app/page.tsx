@@ -68,19 +68,21 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
 };
 
 const PRESET_CHIPS = [
-  { label: "Clean Public DNS (8.8.8.8)", prompt: "Analyze IP 8.8.8.8" },
-  { label: "Malicious Tor Node", prompt: "Analyze IP 185.220.101.43" },
-  { label: "Critical Backdoor (XZ Utils)", prompt: "Query CVE-2024-3094" },
-  { label: "IoT Hardware (Raspberry Pi)", prompt: "Resolve MAC B8:27:EB:AA:BB:CC" },
+  { label: "Multi-Vector Triage", prompt: "Analyze IP 185.220.101.43 and query CVE-2024-3094" },
+  { label: "Agent Capabilities", prompt: "Hello Cybersicker, what are your core capabilities as a SOC agent?" },
+  { label: "Autoencoder Architecture", prompt: "Explain how an autoencoder detects anomalies in network flows" },
+  { label: "SSH Hardening SOP", prompt: "How do I secure an SSH server on port 22 against brute force?" },
   { label: "SYN Flood Mitigation", prompt: "What is the containment playbook for SYN flood attack?" },
+  { label: "Clean Public DNS", prompt: "Analyze IP 8.8.8.8" },
 ];
 
 const ROTATING_PLACEHOLDERS = [
-  "e.g., 'Analyze IP 8.8.8.8 and query CVE-2024-3094'...",
-  "e.g., 'Resolve MAC B8:27:EB:AA:BB:CC and analyze network telemetry'...",
-  "e.g., 'Analyze IP 185.220.101.43 and query CVE-2021-44228'...",
+  "e.g., 'Analyze IP 185.220.101.43 and query CVE-2024-3094'...",
+  "e.g., 'Hello Cybersicker, what are your core capabilities as a SOC agent?'...",
+  "e.g., 'Explain how an autoencoder detects anomalies in network flows'...",
+  "e.g., 'How do I secure an SSH server on port 22 against brute force?'...",
   "e.g., 'What is the containment playbook for SYN flood attack?'...",
-  "e.g., 'Resolve MAC FC:65:DE:12:34:56 and check device vendor'...",
+  "e.g., 'Resolve MAC B8:27:EB:AA:BB:CC and inspect hardware identity'...",
 ];
 
 export default function Home() {

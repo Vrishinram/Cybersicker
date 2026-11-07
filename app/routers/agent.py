@@ -76,22 +76,36 @@ class ScanTrafficRequest(BaseModel):
 # OLLAMA / LLM SYNTHESIS ENGINE
 # ═══════════════════════════════════════════════════════════════
 
-SYSTEM_PROMPT = """You are the Senior Blue-Team Incident Response Lead and Threat Triage Architect for the Cybersicker SOC Workbench.
+SYSTEM_PROMPT_INCIDENT = """You are the Senior Blue-Team Incident Response Lead and Threat Triage Architect for the Cybersicker SOC Workbench (created by Vrishin Ram.K).
 Analyze the provided live telemetry, threat intelligence feeds, CVE advisories, and ChromaDB playbooks.
 Produce an authoritative, highly actionable incident triage report following these strict rules:
 1. Role: Elite Cyber Defense Commander. Zero pleasantries, zero conversational filler, zero emojis.
 2. Structure:
    - Executive Triage Verdict (Threat Severity, Triage Status, Primary MITRE ATT&CK technique IDs like T1499, T1059, T1486).
-   - Dynamic Indicator Intelligence (live VirusTotal detection ratios, ASN attribution, NVD CVSS 3.1 vectors, OUI classifications).
+   - Dynamic Indicator Intelligence (live VirusTotal detection ratios, ASN attribution, NVD CVSS 3.1 vectors, OUI classifications). Only reflect actual telemetry provided. If clean/nominal, clearly report nominal status.
    - Real-Time Defensive Containment Protocol (immediate copy-paste Linux sysctl, iptables, switchport, and endpoint isolation CLI commands).
    - Forensic Next Steps (evidence acquisition, memory dumps, network PCAP filters).
 3. Do not invent simulated indicators; synthesize only the true telemetry metrics provided in the context.
 """
 
+SYSTEM_PROMPT_GENERAL = """You are Cybersicker, an elite autonomous Blue-Team SOC Analyst and Cybersecurity Agent created by Vrishin Ram.K.
+You assist security operators with real-time threat analysis, incident response, network anomaly detection, log analysis, and defensive hardening.
+Rules:
+1. Role: Authoritative, highly technical Cyber Defense Lead.
+2. If the user presents a general question, concept, or technical architecture topic (e.g., autoencoders, anomaly detection, MITRE ATT&CK, firewalling, encryption): Provide clear, in-depth technical analysis and explanations.
+3. If the user asks for defensive guidance, hardening, or incident containment: Provide step-by-step tactical protocols and actionable copy-paste CLI commands (sysctl, iptables, ufw, etc.).
+4. If the user pastes unstructured logs or event descriptions: Analyze the log signatures, assess the attack vector, identify any embedded indicators, and outline containment steps.
+5. If the user asks for playbooks or runbooks: Synthesize relevant runbook steps (including any ChromaDB playbook context provided).
+6. If the user greets or asks about your capabilities: Welcome them professionally, outline your active SOC capabilities (VirusTotal IP reputation, NIST NVD CVE lookup, IEEE OUI hardware identification, In-Memory Autoencoder traffic scanning, ChromaDB semantic playbooks), and suggest sample queries.
+7. Zero Hallucination: Do NOT fabricate fake IP addresses, fake CVE numbers, or fake VirusTotal scores. If no indicators were provided, answer the directive directly without forcing an empty incident report.
+"""
+
+SYSTEM_PROMPT = SYSTEM_PROMPT_INCIDENT  # Backward-compatibility alias
+
 async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str:
     """
     Synthesizes multi-tool intelligence and RAG playbooks using Ollama (or Gemini fallback),
-    measuring latency and token consumption.
+    measuring latency and token consumption. Adapts system instructions based on indicator presence.
     """
     start_time = time.time()
     provider = os.getenv("LLM_PROVIDER", "ollama").lower()
@@ -99,12 +113,26 @@ async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str
     ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
     google_key = os.getenv("GOOGLE_API_KEY", "").strip()
 
+    has_indicators = bool(
+        context_summary.get("threat_intelligence")
+        or context_summary.get("vulnerabilities")
+        or context_summary.get("hardware_oui")
+        or context_summary.get("traffic_scan")
+    )
+
+    if has_indicators:
+        system_prompt = SYSTEM_PROMPT_INCIDENT
+        directive_footer = "Generate the comprehensive Blue-Team Incident Response report:"
+    else:
+        system_prompt = SYSTEM_PROMPT_GENERAL
+        directive_footer = "Respond authoritatively and assist the operator as Cybersicker SOC Agent:"
+
     context_str = json.dumps(context_summary, indent=2, default=str)
     full_prompt = (
-        f"{SYSTEM_PROMPT}\n\n"
-        f"--- CONTEXT TELEMETRY & INTELLIGENCE ---\n{context_str}\n\n"
+        f"{system_prompt}\n\n"
+        f"--- CONTEXT TELEMETRY & PLAYBOOKS ---\n{context_str}\n\n"
         f"--- OPERATOR DIRECTIVE ---\n{prompt}\n\n"
-        "Generate the comprehensive Blue-Team Incident Response report:"
+        f"{directive_footer}"
     )
 
     # 1. Primary: Ollama Local LLM
@@ -115,10 +143,10 @@ async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str
             response = await client.chat(
                 model=ollama_model,
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": full_prompt}
                 ],
-                options={"temperature": 0.0}
+                options={"temperature": 0.1 if has_indicators else 0.3}
             )
             report_text = response["message"]["content"]
             est_tokens = len(full_prompt.split()) + len(report_text.split())
@@ -178,6 +206,107 @@ def generate_deterministic_report(prompt: str, context: Dict[str, Any]) -> str:
     oui_results = context.get("hardware_oui", [])
     rag_playbooks = context.get("rag_playbooks", [])
     scan_result = context.get("traffic_scan")
+
+    has_indicators = bool(vt_results or cve_results or oui_results or scan_result)
+
+    # If NO specific network indicators are present, provide intelligent contextual assistance
+    if not has_indicators:
+        prompt_lower = prompt.lower()
+
+        # Check for greeting / identity / capabilities
+        if any(k in prompt_lower for k in ["hello", "hi", "hey", "who are you", "what can you do", "capabilities", "help", "about"]):
+            return (
+                "### [CYBERSICKER SOC AGENT] Operational Briefing\n\n"
+                "Greetings, Operator. I am **Cybersicker**, an autonomous Blue-Team SOC Analyst and Incident Response Agent created by **Vrishin Ram.K**.\n\n"
+                "#### Active Defense Capabilities:\n"
+                "- **Threat Intelligence (VirusTotal v3)**: Real-time reputation scoring, malicious engine counts, ASN attribution.\n"
+                "- **Vulnerability Intelligence (NIST NVD 2.0)**: Live CVE CVSS 3.1 scoring, exploitability metrics, CWE weaknesses, patch advisories.\n"
+                "- **Hardware Profiling (IEEE OUI Engine)**: Layer 2 MAC resolution, manufacturer lookup, LAA/randomized detection.\n"
+                "- **Deep Network Anomaly Detection (In-Memory Autoencoder)**: 16→8→16 neural autoencoder trained on NSL-KDD packet traffic with MSE loss computation.\n"
+                "- **Contextual Runbook Retrieval (ChromaDB Semantic RAG)**: Instant incident containment SOPs with copy-paste CLI commands.\n\n"
+                "#### Example Directives:\n"
+                "- *Multi-vector Triage*: `Analyze IP 185.220.101.43 and query CVE-2024-3094`\n"
+                "- *Defense SOP*: `Provide SYN flood mitigation runbook` or `Ransomware outbreak containment`\n"
+                "- *Architecture Inquiry*: `Explain how the autoencoder detects anomalous packet flows`\n"
+                "- *Advisory*: `How do I secure an SSH server against brute force attacks?`\n"
+                "- *Log Analysis*: Paste raw syslog, auth.log, or firewall drop events directly into chat."
+            )
+
+        # Check for Autoencoder / Anomaly detection inquiry
+        if any(k in prompt_lower for k in ["autoencoder", "anomaly", "anomalies", "kdd", "reconstruction loss", "mse", "neural network"]):
+            return (
+                "### [SOC ARCHITECTURE BRIEFING] In-Memory Deep Autoencoder Anomaly Detection\n\n"
+                "The **Cybersicker Network Anomaly Engine** employs an unsupervised deep neural autoencoder designed to detect subtle zero-day intrusions and volumetric packet anomalies without requiring pre-labeled attack signatures.\n\n"
+                "#### Architecture Specifications:\n"
+                "- **Input Dimension**: Normalized NSL-KDD packet feature vectors (duration, protocol_type, flag, src_bytes, dst_bytes, count, srv_count, etc.).\n"
+                "- **Neural Topology**: Symmetrical bottleneck architecture: `Input (16) → Latent Representation (8) → Output Reconstruction (16)`.\n"
+                "- **Loss Function**: Mean Squared Error (MSE) measuring reconstruction fidelity:\n"
+                "  $$\\text{MSE} = \\frac{1}{N} \\sum_{i=1}^{N} (x_i - \\hat{x}_i)^2$$\n"
+                "- **Detection Threshold**: Calibrated baseline $\\tau = 0.042$ (or operator-configured $\\tau = 0.5$).\n"
+                "  - If $\\text{MSE} \\le \\tau$: Flow conforms to nominal network baseline (**CLEAN**).\n"
+                "  - If $\\text{MSE} > \\tau$: Latent space fails to reconstruct anomalous traffic manifold (**ANOMALY DETECTED**).\n\n"
+                "#### High-Risk Feature Deviations:\n"
+                "When anomalies are triggered, the engine calculates feature-wise deviation ratios to pinpoint specific attack dimensions such as abnormal SYN packet rates, elevated `dst_bytes`, or suspicious connection service ratios."
+            )
+
+        # Check for SSH / Port 22 / Hardening inquiry
+        if any(k in prompt_lower for k in ["ssh", "port 22", "harden", "brute force", "failed password"]):
+            return (
+                "### [TACTICAL DEFENSE ADVISORY] Host & Service Hardening: OpenSSH (Port 22)\n\n"
+                "To contain and mitigate unauthorized access or brute-force attempts against SSH infrastructure:\n\n"
+                "#### 1. Immediate Host Containment (iptables & UFW Rate Limiting):\n"
+                "```bash\n"
+                "# Limit SSH connections to maximum 4 attempts per 60 seconds per source IP\n"
+                "sudo iptables -I INPUT -p tcp --dport 22 -m state --state NEW -m recent --set\n"
+                "sudo iptables -I INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 4 -j DROP\n\n"
+                "# Or via UFW rate limiting:\n"
+                "sudo ufw limit ssh/tcp\n"
+                "```\n\n"
+                "#### 2. OpenSSH Hardening Configuration (`/etc/ssh/sshd_config`):\n"
+                "```text\n"
+                "PermitRootLogin no\n"
+                "PasswordAuthentication no\n"
+                "PubkeyAuthentication yes\n"
+                "MaxAuthTries 3\n"
+                "LoginGraceTime 30\n"
+                "X11Forwarding no\n"
+                "AllowAgentForwarding no\n"
+                "```\n\n"
+                "#### 3. Active Intrusion Prevention (Fail2ban):\n"
+                "Deploy Fail2ban to automatically jail offending subnets after 3 failed password attempts for 24 hours:\n"
+                "```bash\n"
+                "sudo apt-get install fail2ban -y\n"
+                "sudo systemctl enable --now fail2ban\n"
+                "sudo fail2ban-client status sshd\n"
+                "```"
+            )
+
+        # Check for Playbook / Runbook queries
+        top_playbook = rag_playbooks[0] if rag_playbooks else None
+        if top_playbook and (top_playbook.get("similarity_score", 0) > 0.4 or any(k in prompt_lower for k in ["playbook", "sop", "mitigat", "containment", "runbook", "syn flood", "ransomware", "arp spoof", "ddos"])):
+            return (
+                f"### [PLAYBOOK DIRECTIVE] ChromaDB Contextual Runbook Match\n\n"
+                f"- **Target Runbook**: **{top_playbook.get('title')}**\n"
+                f"- **Playbook ID**: `{top_playbook.get('id')}`\n"
+                f"- **Semantic Similarity Score**: `{top_playbook.get('similarity_score')}`\n"
+                f"- **NIST CSF Alignment**: `{top_playbook.get('nist_csf')}`\n\n"
+                f"#### Tactical Action Steps:\n"
+                "```bash\n" + "\n".join(top_playbook.get("action_steps", [])) + "\n```\n\n"
+                f"#### Runbook Overview:\n{top_playbook.get('document', '')}"
+            )
+
+        # General Advisory / Triage fallthrough
+        engine_name = f"Ollama ({os.getenv('OLLAMA_MODEL', 'llama3.2')})" if os.getenv("LLM_PROVIDER", "ollama").lower() == "ollama" else "Cybersicker Blue-Team Lead"
+        return (
+            f"### [SOC OPERATIONAL ADVISORY] Defense Guidance\n\n"
+            f"- **Analyst Engine**: {engine_name}\n"
+            f"- **Status**: Active Monitoring\n\n"
+            f"**Directive Received**: *\"{prompt}\"*\n\n"
+            "#### Blue-Team Tactical Recommendations:\n"
+            "1. **Continuous Inspection**: Ensure network taps and host telemetry agents are actively feeding log streams.\n"
+            "2. **Indicator Validation**: If you have observed specific suspect entities (IPv4 addresses, CVE identifiers, MAC addresses), submit them for immediate multi-tool intelligence enrichment.\n"
+            "3. **Zero-Trust Posture**: Maintain principle of least privilege, enforce micro-segmentation, and verify all external ingress routes."
+        )
 
     # Determine overall status
     is_critical = (
