@@ -147,11 +147,11 @@ export default function ChatFeed({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
       {messages.length === 0 ? (
-        <div className="h-full flex flex-col justify-center max-w-2xl mx-auto py-8 space-y-6">
+        <div className="h-full flex flex-col justify-center max-w-2xl mx-auto py-8 space-y-6 animate-slide-up">
           <div className="text-center space-y-2">
-            <h2 className="font-heading font-extrabold text-xl text-[var(--text-high)]">
+            <h2 className="font-heading font-extrabold text-xl text-[var(--text-high)] tracking-tight">
               Blue-Team Security Operations Workbench
             </h2>
             <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
@@ -162,16 +162,16 @@ export default function ChatFeed({
           {/* Full Pipeline Action Card */}
           <div
             onClick={onRunFullPipeline}
-            className="quick-action-card p-4 rounded bg-gradient-to-r from-[var(--accent-primary)]/15 via-[var(--surface-elevated)] to-[var(--surface-elevated)] border border-[var(--accent-primary)]/40 hover:border-[var(--accent-primary)] cursor-pointer flex items-center justify-between transition-all"
+            className="quick-action-card p-4 rounded-lg bg-gradient-to-r from-[var(--accent-primary)]/20 via-[var(--surface-elevated)] to-[var(--surface-elevated)] border border-[var(--accent-primary)]/50 hover:border-[var(--accent-light)] cursor-pointer flex items-center justify-between shadow-lg group"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded bg-[var(--accent-primary)]/20 border border-[var(--accent-primary)]/50 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-md bg-[var(--accent-primary)]/25 border border-[var(--accent-primary)]/60 flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:border-[var(--accent-light)] transition-all">
                 <Layers className="w-5 h-5 text-[var(--accent-light)]" />
               </div>
               <div>
                 <div className="font-heading text-xs font-bold text-[var(--text-high)] flex items-center gap-2">
                   <span>Execute Full-Spectrum Triage Pipeline (All 5 Tools)</span>
-                  <span className="font-mono text-[0.6rem] px-1.5 py-0.2 rounded bg-[var(--accent-primary)]/30 text-[var(--accent-light)] font-semibold uppercase">
+                  <span className="font-mono text-[0.6rem] px-2 py-0.5 rounded bg-[var(--accent-primary)]/30 text-[var(--accent-light)] border border-[var(--accent-primary)]/40 font-semibold uppercase">
                     RECOMMENDED
                   </span>
                 </div>
@@ -186,7 +186,7 @@ export default function ChatFeed({
                 e.stopPropagation();
                 onRunFullPipeline();
               }}
-              className="btn-primary text-xs py-1.5 px-3 shrink-0 ml-4"
+              className="btn-primary text-xs py-2 px-4 shrink-0 ml-4 font-semibold shadow-md active:scale-95 transition-all"
             >
               Run All Tools
             </button>
@@ -196,33 +196,48 @@ export default function ChatFeed({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div
               onClick={() => onSendPresetMessage("Run an autoencoder anomaly scan on KDDTrain+.txt and report anomalies.")}
-              className="quick-action-card p-3.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] cursor-pointer"
+              className="quick-action-card p-3.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border-distinct)] cursor-pointer group"
             >
-              <div className="font-mono text-[0.65rem] text-[var(--accent-light)] uppercase font-semibold">Triage Action 1</div>
-              <div className="font-heading text-xs font-bold text-[var(--text-high)] mt-1">Scan Network Capture</div>
-              <p className="text-[0.72rem] text-[var(--text-muted)] mt-1">
+              <div className="font-mono text-[0.65rem] text-[var(--accent-light)] uppercase font-semibold flex items-center justify-between">
+                <span>Triage Action 1</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-light)] opacity-70 group-hover:opacity-100" />
+              </div>
+              <div className="font-heading text-xs font-bold text-[var(--text-high)] mt-1.5 group-hover:text-white transition-colors">
+                Scan Network Capture
+              </div>
+              <p className="text-[0.72rem] text-[var(--text-muted)] mt-1 leading-snug">
                 Runs Keras autoencoder across KDDTrain+.txt baseline traffic.
               </p>
             </div>
 
             <div
               onClick={() => onSendPresetMessage("Investigate IP 185.220.101.43 using VirusTotal and check if it communicates with known botnets.")}
-              className="quick-action-card p-3.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] cursor-pointer"
+              className="quick-action-card p-3.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border-distinct)] cursor-pointer group"
             >
-              <div className="font-mono text-[0.65rem] text-[var(--accent-light)] uppercase font-semibold">Triage Action 2</div>
-              <div className="font-heading text-xs font-bold text-[var(--text-high)] mt-1">Analyze Tor Exit Node</div>
-              <p className="text-[0.72rem] text-[var(--text-muted)] mt-1">
+              <div className="font-mono text-[0.65rem] text-[var(--accent-light)] uppercase font-semibold flex items-center justify-between">
+                <span>Triage Action 2</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-light)] opacity-70 group-hover:opacity-100" />
+              </div>
+              <div className="font-heading text-xs font-bold text-[var(--text-high)] mt-1.5 group-hover:text-white transition-colors">
+                Analyze Tor Exit Node
+              </div>
+              <p className="text-[0.72rem] text-[var(--text-muted)] mt-1 leading-snug">
                 Performs VirusTotal reputation check on suspicious IP 185.220.101.43.
               </p>
             </div>
 
             <div
               onClick={() => onSendPresetMessage("Query NIST NVD for CVE-2024-3094 and provide incident response containment steps.")}
-              className="quick-action-card p-3.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] cursor-pointer"
+              className="quick-action-card p-3.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border-distinct)] cursor-pointer group"
             >
-              <div className="font-mono text-[0.65rem] text-[var(--accent-light)] uppercase font-semibold">Triage Action 3</div>
-              <div className="font-heading text-xs font-bold text-[var(--text-high)] mt-1">Query XZ Utils Backdoor</div>
-              <p className="text-[0.72rem] text-[var(--text-muted)] mt-1">
+              <div className="font-mono text-[0.65rem] text-[var(--accent-light)] uppercase font-semibold flex items-center justify-between">
+                <span>Triage Action 3</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-light)] opacity-70 group-hover:opacity-100" />
+              </div>
+              <div className="font-heading text-xs font-bold text-[var(--text-high)] mt-1.5 group-hover:text-white transition-colors">
+                Query XZ Utils Backdoor
+              </div>
+              <p className="text-[0.72rem] text-[var(--text-muted)] mt-1 leading-snug">
                 Extracts CVSS 10.0 metrics and NIST mitigation playbooks for CVE-2024-3094.
               </p>
             </div>
@@ -236,37 +251,37 @@ export default function ChatFeed({
               key={i}
               className={`flex flex-col animate-slide-up ${msg.role === "user" ? "items-end" : "items-start"}`}
             >
-              <div className="font-mono text-[0.65rem] text-[var(--text-muted)] mb-1 uppercase tracking-wider flex items-center gap-2">
+              <div className="font-mono text-[0.65rem] text-[var(--text-muted)] mb-1.5 uppercase tracking-wider flex items-center gap-2">
                 <span className="flex items-center gap-1.5">
                   {msg.role === "user" ? (
                     <>
                       <User className="w-3.5 h-3.5 text-[var(--accent-light)]" />
-                      <span>OPERATOR</span>
+                      <span className="font-semibold text-[var(--text-medium)]">OPERATOR</span>
                     </>
                   ) : (
                     <>
                       <img src="/logo.png" alt="Cybersicker Agent" className="w-3.5 h-3.5 object-contain" />
-                      <span>BLUE-TEAM AGENT</span>
+                      <span className="font-semibold text-[var(--accent-light)]">BLUE-TEAM AGENT</span>
                     </>
                   )}
                 </span>
                 {msg.role === "ai" && (
                   <button
                     onClick={() => handleCopyText(msg.content, i)}
-                    className="hover:text-[var(--text-high)] transition-colors p-0.5 cursor-pointer"
+                    className="hover:text-[var(--text-high)] transition-colors p-0.5 cursor-pointer ml-1"
                     title="Copy report"
                   >
                     {copiedIndex === i ? (
-                      <Check className="w-3 h-3 text-[#00ff9d]" />
+                      <Check className="w-3.5 h-3.5 text-[#00ff9d]" />
                     ) : (
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-3 h-3 text-[var(--text-muted)] hover:text-white" />
                     )}
                   </button>
                 )}
               </div>
 
               <div
-                className={`max-w-[90%] md:max-w-[85%] px-4 py-3 text-[0.84rem] leading-relaxed ${
+                className={`max-w-[92%] md:max-w-[85%] px-4 py-3.5 text-[0.84rem] leading-relaxed shadow-md ${
                   msg.role === "user" ? "chat-bubble-operator" : "chat-bubble-agent"
                 }`}
               >
@@ -274,7 +289,7 @@ export default function ChatFeed({
 
                 {/* Actionable Response Controls (Active Defense Buttons) */}
                 {msg.role === "ai" && (threatIp || threatCve || isDossier) && (
-                  <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-2 text-xs font-mono">
+                  <div className="mt-3.5 pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-2 text-xs font-mono">
                     {/* Requirement 1: Conditional IP Controls based on verdict */}
                     {threatIp && (
                       <>
@@ -283,16 +298,16 @@ export default function ChatFeed({
                           <>
                             <button
                               onClick={() => handleCopyContainmentRule(threatIp)}
-                              className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer"
+                              className="active-defense-btn px-2.5 py-1.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 text-[0.7rem] cursor-pointer"
                             >
                               {copiedRuleIp === threatIp ? (
                                 <>
-                                  <Check className="w-3 h-3 text-[#00ff9d]" />
+                                  <Check className="w-3.5 h-3.5 text-[#00ff9d]" />
                                   <span className="text-[#00ff9d] font-semibold">Copied!</span>
                                 </>
                               ) : (
                                 <>
-                                  <Copy className="w-3 h-3 text-[var(--accent-light)]" />
+                                  <Copy className="w-3.5 h-3.5 text-[var(--accent-light)]" />
                                   <span>Copy Containment Rule</span>
                                 </>
                               )}
@@ -301,32 +316,32 @@ export default function ChatFeed({
                             <button
                               onClick={() => onBlockIp(threatIp)}
                               disabled={blockedIps.has(threatIp)}
-                              className={`px-2.5 py-1 rounded border flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer ${
+                              className={`active-defense-btn px-2.5 py-1.5 rounded border flex items-center gap-1.5 text-[0.7rem] cursor-pointer ${
                                 blockedIps.has(threatIp)
-                                  ? "bg-[var(--status-danger-bg)] border-[var(--status-danger-bd)] text-[var(--status-danger)] cursor-not-allowed"
-                                  : "bg-[var(--status-danger-bg)]/40 border-[var(--status-danger-bd)]/60 text-[var(--status-danger)] hover:bg-[var(--status-danger-bg)] hover:border-[var(--status-danger-bd)]"
+                                  ? "bg-[var(--status-danger-bg)] border-[var(--status-danger-bd)] text-[var(--status-danger)] cursor-not-allowed opacity-90"
+                                  : "bg-[var(--status-danger-bg)]/50 border-[var(--status-danger-bd)]/70 text-[var(--status-danger)] hover:bg-[var(--status-danger-bg)] hover:border-[var(--status-danger-bd)]"
                               }`}
                             >
                               {blockedIps.has(threatIp) ? (
                                 <>
-                                  <ShieldCheck className="w-3 h-3 text-[#00ff9d]" />
-                                  <span>Blocked at Border</span>
+                                  <ShieldCheck className="w-3.5 h-3.5 text-[#00ff9d]" />
+                                  <span className="font-semibold">Blocked at Border</span>
                                 </>
                               ) : (
                                 <>
-                                  <ShieldAlert className="w-3 h-3" />
+                                  <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
                                   <span>Block Border Ingress</span>
                                 </>
                               )}
                             </button>
                           </>
                         ) : (
-                          /* If verdict === 'CLEAN' (e.g. 8.8.8.8) -> DO NOT render containment buttons, render neutral [Inspect ASN / WHOIS] */
+                          /* If verdict === 'CLEAN' -> render neutral [Inspect ASN / WHOIS] */
                           <button
                             onClick={() => handleInspectAsnWhois(threatIp)}
-                            className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/20 hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer"
+                            className="active-defense-btn px-2.5 py-1.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/20 hover:border-[var(--accent-light)] flex items-center gap-1.5 text-[0.7rem] cursor-pointer"
                           >
-                            <Globe className="w-3 h-3 text-[var(--accent-light)]" />
+                            <Globe className="w-3.5 h-3.5 text-[var(--accent-light)]" />
                             <span>Inspect ASN / WHOIS</span>
                           </button>
                         )}
@@ -339,9 +354,9 @@ export default function ChatFeed({
                         href={`https://nvd.nist.gov/vuln/detail/${threatCve}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer"
+                        className="active-defense-btn px-2.5 py-1.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] flex items-center gap-1.5 text-[0.7rem] cursor-pointer"
                       >
-                        <ExternalLink className="w-3 h-3 text-[var(--accent-light)]" />
+                        <ExternalLink className="w-3.5 h-3.5 text-[var(--accent-light)]" />
                         <span>View NIST Advisory ({threatCve})</span>
                       </a>
                     )}
@@ -350,9 +365,9 @@ export default function ChatFeed({
                     {(isDossier || threatIp || threatCve) && (
                       <button
                         onClick={() => handleExportStixBundle(msg.content, threatIp, threatCve, verdict)}
-                        className="px-2.5 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--accent-primary)]/40 text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/20 hover:border-[var(--accent-primary)] flex items-center gap-1.5 transition-all text-[0.7rem] cursor-pointer"
+                        className="active-defense-btn px-2.5 py-1.5 rounded bg-[var(--surface-elevated)] border border-[var(--accent-primary)]/50 text-[var(--accent-light)] hover:bg-[var(--accent-primary)]/25 hover:border-[var(--accent-light)] flex items-center gap-1.5 text-[0.7rem] cursor-pointer"
                       >
-                        <Download className="w-3 h-3" />
+                        <Download className="w-3.5 h-3.5" />
                         <span>Export STIX 2.1 Bundle</span>
                       </button>
                     )}
@@ -364,10 +379,25 @@ export default function ChatFeed({
         })
       )}
 
+      {/* Elegant Multi-Step Blue-Team Loading State */}
       {chatLoading && (
-        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] font-mono py-2 animate-fade-in">
-          <Loader2 className="w-4 h-4 text-[var(--accent-light)] animate-spin" />
-          <span>Gemini 2.5 Flash is orchestrating tools &amp; synthesizing report...</span>
+        <div className="flex flex-col gap-2.5 p-4 rounded-lg bg-[var(--surface-panel)] border border-[var(--border-distinct)] animate-slide-up shadow-xl max-w-lg">
+          <div className="flex items-center justify-between text-xs font-mono text-[var(--text-muted)] pb-2 border-b border-[var(--border-subtle)]">
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[var(--accent-light)] animate-ping" />
+              <span className="text-[var(--text-high)] font-semibold uppercase tracking-wider">Blue-Team Dispatch Active</span>
+            </span>
+            <span className="text-[var(--accent-light)] font-mono text-[0.65rem] animate-pulse">INVESTIGATING...</span>
+          </div>
+          <div className="flex items-center gap-3 py-1">
+            <Loader2 className="w-5 h-5 text-[var(--accent-light)] animate-spin shrink-0" />
+            <div className="text-[0.78rem] text-[var(--text-medium)] font-body leading-snug">
+              Correlating multi-vector telemetry, executing deep autoencoder inference, and synthesizing Blue-Team Incident Report...
+            </div>
+          </div>
+          <div className="w-full bg-[var(--surface-elevated)] h-1.5 rounded-full overflow-hidden mt-1">
+            <div className="h-full bg-gradient-to-r from-[var(--accent-primary)] via-[var(--accent-light)] to-[var(--accent-primary)] animate-shimmer w-full" />
+          </div>
         </div>
       )}
 

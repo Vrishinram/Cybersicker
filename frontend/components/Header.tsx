@@ -79,7 +79,7 @@ export default function Header({
         <button
           onClick={handleReset}
           title="Reset session history and telemetry logs to boot state"
-          className="font-mono text-[0.68rem] px-2.5 py-1.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-[var(--status-danger)] hover:border-[var(--status-danger-bd)] hover:bg-[var(--status-danger-bg)]/20 transition-all flex items-center gap-1.5 cursor-pointer uppercase tracking-wider font-semibold"
+          className="font-mono text-[0.68rem] px-2.5 py-1.5 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-[var(--status-danger)] hover:border-[var(--status-danger-bd)] hover:bg-[var(--status-danger-bg)]/20 active:scale-95 transition-all duration-150 flex items-center gap-1.5 cursor-pointer uppercase tracking-wider font-semibold"
         >
           <RotateCcw className="w-3 h-3 text-[var(--accent-light)] group-hover:text-[var(--status-danger)]" />
           <span>RESET SESSION</span>

@@ -183,10 +183,10 @@ export default function Sidebar({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => !fileUploadLoading && fileInputRef.current?.click()}
-          className={`p-3 rounded-md border border-dashed transition-all cursor-pointer flex items-center gap-3 ${
+          className={`p-3.5 rounded-md border border-dashed transition-all duration-200 cursor-pointer flex items-center gap-3 ${
             isDragging
-              ? "border-[var(--accent-light)] bg-[var(--accent-primary)]/15 scale-[1.01]"
-              : "border-[var(--border-distinct)] bg-[var(--surface-elevated)]/40 hover:border-[var(--accent-light)]"
+              ? "border-[var(--accent-light)] bg-[var(--accent-primary)]/20 scale-[1.02] shadow-[0_0_20px_rgba(56,189,248,0.3)] ring-2 ring-[var(--accent-light)]/50"
+              : "border-[var(--border-distinct)] bg-[var(--surface-elevated)]/40 hover:border-[var(--accent-light)] hover:bg-[var(--surface-elevated)]/70 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.3)] active:translate-y-0"
           } ${fileUploadLoading ? "opacity-75 cursor-not-allowed" : ""}`}
         >
           <input
@@ -197,11 +197,11 @@ export default function Sidebar({
             onChange={handleFileUpload}
           />
 
-          <div className="w-8 h-8 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0">
+          <div className={`w-8 h-8 rounded bg-[var(--surface-elevated)] border border-[var(--border-distinct)] flex items-center justify-center shrink-0 transition-all duration-200 ${isDragging ? "scale-110 bg-[var(--accent-light)]/20 border-[var(--accent-light)]" : ""}`}>
             {fileUploadLoading ? (
               <Loader2 className="w-4 h-4 text-[var(--accent-light)] animate-spin" />
             ) : (
-              <UploadCloud className="w-4 h-4 text-[var(--accent-light)]" />
+              <UploadCloud className={`w-4 h-4 text-[var(--accent-light)] transition-transform duration-200 ${isDragging ? "scale-125 text-white" : ""}`} />
             )}
           </div>
 

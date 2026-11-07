@@ -128,10 +128,10 @@ export default function TelemetryDock({
             <button
               key={lvl}
               onClick={() => onFilterChange(lvl)}
-              className={`px-1.5 py-0.5 rounded transition-colors uppercase cursor-pointer ${
+              className={`px-1.5 py-0.5 rounded uppercase cursor-pointer transition-all active:scale-90 ${
                 filter === lvl
-                  ? "bg-[var(--accent-primary)] text-white font-semibold"
-                  : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:text-white"
+                  ? "bg-[var(--accent-primary)] text-white font-semibold shadow-[0_0_8px_rgba(56,189,248,0.4)]"
+                  : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface-elevated)]/90"
               }`}
             >
               {lvl === "info" ? "INF" : lvl === "warn" ? "WRN" : lvl === "error" ? "ERR" : "ALL"}
@@ -150,7 +150,7 @@ export default function TelemetryDock({
           </div>
         ) : (
           filteredLogs.map((log, i) => (
-            <div key={i} className="flex gap-2 log-entry-item leading-snug">
+            <div key={i} className="flex gap-2 log-entry-item leading-snug animate-log-slide">
               <span className="text-[var(--text-muted)] shrink-0 select-none">{log.ts}</span>
               <span
                 className={`shrink-0 font-bold select-none ${

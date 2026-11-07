@@ -595,10 +595,10 @@ ${d.top_anomalous_endpoints?.length
   };
 
   return (
-    <div className="min-h-screen bg-[var(--surface-base)] text-[var(--text-medium)] flex flex-col">
+    <div className="min-h-screen bg-[var(--surface-base)] text-[var(--text-medium)] flex flex-col soc-ambient-grid relative">
       {/* ═══════════ 1. STATUS & CREDENTIAL NOTICE ═══════════ */}
       {apiStatus === "offline" && (
-        <div className="bg-[var(--status-danger-bg)] border-b border-[var(--status-danger-bd)] px-6 py-2.5 flex items-center justify-between text-xs text-[var(--status-danger)]">
+        <div className="bg-[var(--status-danger-bg)] border-b border-[var(--status-danger-bd)] px-6 py-2.5 flex items-center justify-between text-xs text-[var(--status-danger)] animate-slide-up">
           <div className="flex items-center gap-2">
             <XCircle className="w-4 h-4 shrink-0" />
             <span>
@@ -618,7 +618,7 @@ ${d.top_anomalous_endpoints?.length
       />
 
       {/* ═══════════ 3. INTEGRATED TELEMETRY BAR ═══════════ */}
-      <section className="border-b border-[var(--border-subtle)] bg-[#070b14] px-6 py-2.5 grid grid-cols-2 md:grid-cols-4 gap-4 font-mono text-xs">
+      <section className="border-b border-[var(--border-subtle)] bg-[#070b14]/90 backdrop-blur-sm px-6 py-2.5 grid grid-cols-2 md:grid-cols-4 gap-4 font-mono text-xs">
         <div className="flex items-center justify-between border-r border-[var(--border-subtle)] pr-4">
           <span className="text-[var(--text-muted)] text-[0.65rem] tracking-wider uppercase">Baseline Data</span>
           <span className="text-[var(--text-high)] font-semibold flex items-center gap-1.5">
@@ -637,16 +637,27 @@ ${d.top_anomalous_endpoints?.length
 
         <div className="flex items-center justify-between border-r border-[var(--border-subtle)] pr-4">
           <span className="text-[var(--text-muted)] text-[0.65rem] tracking-wider uppercase">Threat Posture</span>
-          <span className={`font-bold flex items-center gap-1.5 ${threatLevel === "HIGH" ? "text-[var(--status-danger)]" : "text-[var(--status-warning)]"}`}>
-            <AlertTriangle className="w-3 h-3" />
-            {threatLevel}
+          <span
+            className={`font-bold text-[0.72rem] flex items-center gap-1.5 px-2.5 py-0.5 rounded transition-all duration-300 ${
+              threatLevel === "HIGH"
+                ? "bg-[var(--status-danger-bg)] text-[var(--status-danger)] border border-[var(--status-danger-bd)] animate-threat-high scale-105"
+                : "bg-[var(--status-warning-bg)]/40 text-[var(--status-warning)] border border-[var(--status-warning-bd)]/50 animate-threat-monitoring"
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                threatLevel === "HIGH" ? "bg-rose-500 animate-ping" : "bg-amber-400"
+              }`}
+            />
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>{threatLevel}</span>
           </span>
         </div>
 
         <div className="flex items-center justify-between">
           <span className="text-[var(--text-muted)] text-[0.65rem] tracking-wider uppercase">Active Session</span>
           <span className="text-[var(--status-success)] font-semibold flex items-center gap-1.5">
-            <Activity className="w-3 h-3" />
+            <Activity className="w-3 h-3 text-[var(--status-success-bd)] animate-pulse" />
             SOC ACTIVE
           </span>
         </div>
@@ -717,7 +728,7 @@ ${d.top_anomalous_endpoints?.length
                     setInputValue(chip.prompt);
                     handleSend(chip.prompt);
                   }}
-                  className="px-2.5 py-1 rounded-full text-[0.68rem] font-mono whitespace-nowrap bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] hover:bg-[var(--accent-primary)]/15 transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                  className="preset-chip-btn px-2.5 py-1 rounded-full text-[0.68rem] font-mono whitespace-nowrap bg-[var(--surface-elevated)] border border-[var(--border-distinct)] text-[var(--text-medium)] hover:text-white hover:border-[var(--accent-light)] hover:bg-[var(--accent-primary)]/15 flex items-center gap-1.5 shadow-sm cursor-pointer"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-light)]" />
                   <span>{chip.label}</span>
@@ -737,14 +748,14 @@ ${d.top_anomalous_endpoints?.length
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   placeholder={ROTATING_PLACEHOLDERS[placeholderIndex]}
-                  className="input-field flex-1 pl-14 py-2.5 transition-all"
+                  className="input-field flex-1 pl-14 py-2.5 transition-all focus:ring-1 focus:ring-[var(--accent-light)]"
                   disabled={chatLoading}
                 />
               </div>
               <button
                 onClick={() => handleSend()}
                 disabled={chatLoading || !inputValue.trim()}
-                className="btn-primary flex items-center gap-2 px-5 py-2.5 shrink-0 cursor-pointer"
+                className="btn-primary flex items-center gap-2 px-5 py-2.5 shrink-0 cursor-pointer shadow-md"
               >
                 {chatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 <span>Investigate</span>
@@ -756,21 +767,22 @@ ${d.top_anomalous_endpoints?.length
 
       {/* ═══════════ 5. TOOL EXECUTION MODAL ═══════════ */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="surface-elevated max-w-md w-full p-6 animate-modal-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-modal-backdrop">
+          <div className="surface-elevated max-w-md w-full p-6 animate-modal-in border border-[var(--border-distinct)] shadow-2xl">
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-[var(--border-subtle)]">
-              <h3 className="font-heading font-bold text-sm text-[var(--text-high)]">
-                {activeModal.label}
+              <h3 className="font-heading font-bold text-sm text-[var(--text-high)] flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[var(--accent-light)] animate-pulse" />
+                <span>{activeModal.label}</span>
               </h3>
               <button
                 onClick={() => setActiveModal(null)}
-                className="text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
+                className="text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer p-1 rounded hover:bg-white/5"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-[var(--text-muted)] mb-4">
+            <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
               {activeModal.description}
             </p>
 
@@ -790,7 +802,7 @@ ${d.top_anomalous_endpoints?.length
                   if (e.key === "Enter" && modalInput.trim()) runTool(activeModal, modalInput.trim());
                 }}
                 placeholder={activeModal.placeholder}
-                className="input-field w-full pl-11"
+                className="input-field w-full pl-11 focus:ring-1 focus:ring-[var(--accent-light)]"
               />
             </div>
 
