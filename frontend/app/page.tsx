@@ -135,7 +135,7 @@ export default function Home() {
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) });
+        const res = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
         if (res.ok) {
           const data = await res.json();
           setApiStatus("online");

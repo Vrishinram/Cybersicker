@@ -287,6 +287,7 @@ app.include_router(containment_router)
 
 
 # ─── Health Check ────────────────────────────────────────────
+@app.get("/health")
 @app.get("/api/health")
 async def health():
     return {

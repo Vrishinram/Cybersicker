@@ -17,6 +17,8 @@ export async function GET() {
   return NextResponse.json({
     status: "online",
     deployment: "cloud-edge",
+    llm_provider: "ollama",
+    ollama_model: "llama3.2",
     google_key_set: true,
     groq_key_set: false,
     openrouter_key_set: false,
