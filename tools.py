@@ -20,6 +20,26 @@ from langchain.tools import tool
 
 from autoencoder import run_network_scan
 
+try:
+    from app.services.nvd import CURATED_CVE_CATALOG
+except ImportError:
+    CURATED_CVE_CATALOG = {
+        "CVE-2024-3094": {
+            "published": "2024-03-29",
+            "cvss_score": 10.0,
+            "severity": "CRITICAL",
+            "description": "Malicious code discovered in upstream tarballs of xz-utils (liblzma versions 5.6.0 and 5.6.1) that intercepts OpenSSH sshd process authentication to allow unauthorized remote execution.",
+            "recommendation": "Immediately downgrade xz-utils to 5.4.6 or earlier; inspect all active sshd processes, and revoke compromised SSH host keys."
+        },
+        "CVE-2021-44228": {
+            "published": "2021-12-10",
+            "cvss_score": 10.0,
+            "severity": "CRITICAL",
+            "description": "Apache Log4j2 versions 2.0-beta9 through 2.15.0 JNDI features do not protect against attacker-controlled LDAP/JNDI endpoints (Log4Shell).",
+            "recommendation": "Upgrade to Apache Log4j 2.17.1 or higher immediately."
+        }
+    }
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Cybersicker.Tools")
 
@@ -280,12 +300,28 @@ def query_cve_database(cve_id: str) -> str:
                 f"Description: {clean_desc}\n"
                 f"Recommendation: Patch immediately if score >= 7.0 (High/Critical). Check vendor security advisories."
             )
-        elif response.status_code == 403:
+        elif response.status_code in (403, 429):
+            if cve_id in CURATED_CVE_CATALOG:
+                cached = CURATED_CVE_CATALOG[cve_id]
+                return (
+                    f"CVE ID: {cve_id}\n"
+                    f"Published: {cached['published']}\n"
+                    f"CVSS Score: {cached['cvss_score']} ({cached['severity']})\n"
+                    f"Description: {cached['description']}\n"
+                    f"Recommendation: {cached['recommendation']}"
+                )
             return "NIST NVD API rate limited. Please retry in 30 seconds."
         return f"NVD API returned status code {response.status_code}."
-    except requests.Timeout:
-        return "[Error] NIST NVD query timed out after 10s."
-    except Exception as e:
+    except (requests.Timeout, Exception) as e:
+        if cve_id in CURATED_CVE_CATALOG:
+            cached = CURATED_CVE_CATALOG[cve_id]
+            return (
+                f"CVE ID: {cve_id}\n"
+                f"Published: {cached['published']}\n"
+                f"CVSS Score: {cached['cvss_score']} ({cached['severity']})\n"
+                f"Description: {cached['description']}\n"
+                f"Recommendation: {cached['recommendation']}"
+            )
         return f"Error querying CVE database: {e}"
 
 

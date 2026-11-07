@@ -79,28 +79,67 @@ class ScanTrafficRequest(BaseModel):
 SYSTEM_PROMPT_INCIDENT = """You are the Senior Blue-Team Incident Response Lead and Threat Triage Architect for the Cybersicker SOC Workbench (created by Vrishin Ram.K).
 Analyze the provided live telemetry, threat intelligence feeds, CVE advisories, and ChromaDB playbooks.
 Produce an authoritative, highly actionable incident triage report following these strict rules:
-1. Role: Elite Cyber Defense Commander. Zero pleasantries, zero conversational filler, zero emojis.
+1. Role: Elite Cyber Defense Commander. Zero pleasantries, zero conversational filler, zero emojis. Threat-focused, precise, and technically rigorous.
 2. Structure:
-   - Executive Triage Verdict (Threat Severity, Triage Status, Primary MITRE ATT&CK technique IDs like T1499, T1059, T1486).
-   - Dynamic Indicator Intelligence (live VirusTotal detection ratios, ASN attribution, NVD CVSS 3.1 vectors, OUI classifications). Only reflect actual telemetry provided. If clean/nominal, clearly report nominal status.
-   - Real-Time Defensive Containment Protocol (immediate copy-paste Linux sysctl, iptables, switchport, and endpoint isolation CLI commands).
-   - Forensic Next Steps (evidence acquisition, memory dumps, network PCAP filters).
-3. Do not invent simulated indicators; synthesize only the true telemetry metrics provided in the context.
+   - Executive Triage Verdict: Threat Severity (CRITICAL, HIGH, MEDIUM, LOW), Triage Status (e.g. CONTAINMENT IN PROGRESS), and Primary MITRE ATT&CK technique IDs (e.g. T1499, T1059, T1486).
+   - Dynamic Indicator Intelligence: You MUST explicitly include each analyzed indicator using its EXACT identifier:
+     * Target IPv4 Address: Explicitly state the exact IP (e.g. 185.220.101.43), live VirusTotal detection ratio, reputation verdict, and ASN attribution.
+     * Vulnerability CVE ID: Explicitly state the exact CVE identifier (e.g. CVE-2024-3094), published date, CVSS 3.1 base score, severity vector, CWE weakness, and vendor recommendation. Never confuse or substitute CVE data (e.g. CVE-2024-3094 is XZ-Utils backdoor, NOT Log4j).
+     * Hardware MAC: Explicitly state the exact MAC address (e.g. B8:27:EB:AA:BB:CC), OUI prefix, vendor, and device profile.
+     * Traffic Anomaly Scan: Explicitly state anomaly count, threshold MSE, and model architecture.
+   - Real-Time Defensive Containment Protocol: Immediate copy-paste Linux sysctl, iptables, ufw, switchport VLAN isolation, and endpoint isolation CLI commands.
+   - Forensic Next Steps: Volatile memory dumps, network PCAP filters, and forensic log preservation.
+3. Zero Hallucination: Synthesize only the true telemetry metrics provided in the context. Always preserve and quote the exact IP addresses, CVE IDs, and MAC addresses.
 """
 
 SYSTEM_PROMPT_GENERAL = """You are Cybersicker, an elite autonomous Blue-Team SOC Analyst and Cybersecurity Agent created by Vrishin Ram.K.
 You assist security operators with real-time threat analysis, incident response, network anomaly detection, log analysis, and defensive hardening.
 Rules:
 1. Role: Authoritative, highly technical Cyber Defense Lead.
-2. If the user presents a general question, concept, or technical architecture topic (e.g., autoencoders, anomaly detection, MITRE ATT&CK, firewalling, encryption): Provide clear, in-depth technical analysis and explanations.
-3. If the user asks for defensive guidance, hardening, or incident containment: Provide step-by-step tactical protocols and actionable copy-paste CLI commands (sysctl, iptables, ufw, etc.).
-4. If the user pastes unstructured logs or event descriptions: Analyze the log signatures, assess the attack vector, identify any embedded indicators, and outline containment steps.
-5. If the user asks for playbooks or runbooks: Synthesize relevant runbook steps (including any ChromaDB playbook context provided).
-6. If the user greets or asks about your capabilities: Welcome them professionally, outline your active SOC capabilities (VirusTotal IP reputation, NIST NVD CVE lookup, IEEE OUI hardware identification, In-Memory Autoencoder traffic scanning, ChromaDB semantic playbooks), and suggest sample queries.
+2. If the user asks what tools you have available, what your capabilities are, or what you can do:
+   You MUST clearly list and describe your 5 primary security analysis tools:
+   1. Network Traffic Anomaly Scan (Keras Autoencoder): Evaluates network flows against NSL-KDD baseline using a 16→8→16 neural autoencoder to detect zero-day volumetric anomalies via reconstruction MSE loss.
+   2. VirusTotal Threat Intelligence: Live reputation lookup for remote IPv4 addresses, query latency, multi-vendor detection ratios, and ISP/ASN attribution.
+   3. NIST NVD CVE Advisory: Real-time National Vulnerability Database correlation, CVSS 3.1 base scoring, exploitability/impact vectors, CWE classification, and vendor mitigation.
+   4. Hardware OUI Resolution: Resolves IEEE MAC addresses to manufacturer identities, hardware device classes, and flags locally administered/randomized MACs (LAA).
+   5. Consult Playbook (RAG): Queries ChromaDB semantic vector store for MITRE ATT&CK and NIST CSF-aligned Incident Response Standard Operating Procedures (SOPs) with copy-paste CLI commands.
+3. If the user presents a general question, concept, or technical architecture topic (e.g., autoencoders, anomaly detection, MITRE ATT&CK, firewalling, encryption): Provide clear, in-depth technical analysis and explanations.
+4. If the user asks for defensive guidance, hardening, or incident containment: Provide step-by-step tactical protocols and actionable copy-paste CLI commands (sysctl, iptables, ufw, etc.).
+5. If the user pastes unstructured logs or event descriptions: Analyze the log signatures, assess the attack vector, identify any embedded indicators, and outline containment steps.
+6. If the user asks for playbooks or runbooks: Synthesize relevant runbook steps (including any ChromaDB playbook context provided).
 7. Zero Hallucination: Do NOT fabricate fake IP addresses, fake CVE numbers, or fake VirusTotal scores. If no indicators were provided, answer the directive directly without forcing an empty incident report.
 """
 
 SYSTEM_PROMPT = SYSTEM_PROMPT_INCIDENT  # Backward-compatibility alias
+
+def _ensure_indicators(text: str, context: Dict[str, Any]) -> str:
+    """Guarantees that all extracted indicators are explicitly reflected with their exact identifiers."""
+    missing = []
+    for vt in context.get("threat_intelligence", []):
+        ip = vt.get("ip")
+        if ip and ip not in text:
+            missing.append(
+                f"- **Target IPv4**: `{ip}` | Verdict: **{vt.get('verdict', 'UNKNOWN')}** "
+                f"({vt.get('malicious', 0)}/{vt.get('total_engines', 85)} engines flagged) | ASN: {vt.get('as_owner', 'Unknown')}"
+            )
+    for cve in context.get("vulnerabilities", []):
+        cid = cve.get("cve_id")
+        if cid and cid not in text:
+            missing.append(
+                f"- **Vulnerability**: `{cid}` | CVSS 3.1: **{cve.get('cvss_score', 'N/A')}** ({cve.get('severity', 'UNKNOWN')}) "
+                f"| {cve.get('description', '')[:200]}"
+            )
+    for oui in context.get("hardware_oui", []):
+        mac = oui.get("mac")
+        if mac and mac not in text:
+            missing.append(
+                f"- **Hardware MAC**: `{mac}` | Vendor: **{oui.get('vendor', 'Unknown')}** (OUI: {oui.get('oui', 'N/A')})"
+            )
+    if missing:
+        prefix = "### [EXACT INDICATOR CORRELATION]\n" + "\n".join(missing) + "\n\n"
+        return prefix + text
+    return text
+
 
 async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str:
     """
@@ -120,20 +159,24 @@ async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str
         or context_summary.get("traffic_scan")
     )
 
+    rag_playbooks = context_summary.get("rag_playbooks", [])
+
     if has_indicators:
         system_prompt = SYSTEM_PROMPT_INCIDENT
-        directive_footer = "Generate the comprehensive Blue-Team Incident Response report:"
+        context_str = json.dumps(context_summary, indent=2, default=str)
+        user_content = (
+            f"--- CONTEXT TELEMETRY & PLAYBOOKS ---\n{context_str}\n\n"
+            f"--- OPERATOR DIRECTIVE ---\n{prompt}\n\n"
+            "Generate the comprehensive Blue-Team Incident Response report:"
+        )
     else:
         system_prompt = SYSTEM_PROMPT_GENERAL
-        directive_footer = "Respond authoritatively and assist the operator as Cybersicker SOC Agent:"
+        pb_ref = ""
+        if rag_playbooks:
+            pb_ref = f"\n\n[Playbook Reference Context]:\n{rag_playbooks[0].get('document', '')}"
+        user_content = f"{prompt}{pb_ref}"
 
-    context_str = json.dumps(context_summary, indent=2, default=str)
-    full_prompt = (
-        f"{system_prompt}\n\n"
-        f"--- CONTEXT TELEMETRY & PLAYBOOKS ---\n{context_str}\n\n"
-        f"--- OPERATOR DIRECTIVE ---\n{prompt}\n\n"
-        f"{directive_footer}"
-    )
+    full_prompt = f"{system_prompt}\n\n{user_content}"
 
     # 1. Primary: Ollama Local LLM
     if provider == "ollama" or not google_key:
@@ -144,12 +187,12 @@ async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str
                 model=ollama_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": full_prompt}
+                    {"role": "user", "content": user_content}
                 ],
-                options={"temperature": 0.1 if has_indicators else 0.3}
+                options={"temperature": 0.1 if has_indicators else 0.4}
             )
             report_text = response["message"]["content"]
-            est_tokens = len(full_prompt.split()) + len(report_text.split())
+            est_tokens = len(user_content.split()) + len(report_text.split())
 
             telemetry_service.emit({
                 "event": "SYNTHESIS_COMPLETE",
@@ -157,7 +200,7 @@ async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str
                 "tokens": est_tokens,
                 "latency_ms": int((time.time() - start_time) * 1000)
             })
-            return report_text
+            return _ensure_indicators(report_text, context_summary)
         except Exception as e:
             logger.warning("Ollama invocation encountered error: %s. Trying fallback.", e)
 
@@ -179,7 +222,7 @@ async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str
                 "tokens": est_tokens,
                 "latency_ms": int((time.time() - start_time) * 1000)
             })
-            return report_text
+            return _ensure_indicators(report_text, context_summary)
         except Exception as e:
             logger.warning("Gemini 2.5 Flash invocation encountered error: %s. Using structured fallback synthesis.", e)
 
@@ -192,7 +235,7 @@ async def run_llm_synthesis(prompt: str, context_summary: Dict[str, Any]) -> str
         "latency_ms": int((time.time() - start_time) * 1000)
     })
 
-    return generate_deterministic_report(prompt, context_summary)
+    return _ensure_indicators(generate_deterministic_report(prompt, context_summary), context_summary)
 
 
 # Maintain backward compatibility alias
@@ -213,23 +256,36 @@ def generate_deterministic_report(prompt: str, context: Dict[str, Any]) -> str:
     if not has_indicators:
         prompt_lower = prompt.lower()
 
-        # Check for greeting / identity / capabilities
-        if any(k in prompt_lower for k in ["hello", "hi", "hey", "who are you", "what can you do", "capabilities", "help", "about"]):
+        # Check for tools / capabilities inquiry
+        if any(k in prompt_lower for k in ["tool", "tools", "capabilities", "what can you do", "who are you", "what do you have", "help", "arsenal"]):
             return (
-                "### [CYBERSICKER SOC AGENT] Operational Briefing\n\n"
-                "Greetings, Operator. I am **Cybersicker**, an autonomous Blue-Team SOC Analyst and Incident Response Agent created by **Vrishin Ram.K**.\n\n"
-                "#### Active Defense Capabilities:\n"
-                "- **Threat Intelligence (VirusTotal v3)**: Real-time reputation scoring, malicious engine counts, ASN attribution.\n"
-                "- **Vulnerability Intelligence (NIST NVD 2.0)**: Live CVE CVSS 3.1 scoring, exploitability metrics, CWE weaknesses, patch advisories.\n"
-                "- **Hardware Profiling (IEEE OUI Engine)**: Layer 2 MAC resolution, manufacturer lookup, LAA/randomized detection.\n"
-                "- **Deep Network Anomaly Detection (In-Memory Autoencoder)**: 16→8→16 neural autoencoder trained on NSL-KDD packet traffic with MSE loss computation.\n"
-                "- **Contextual Runbook Retrieval (ChromaDB Semantic RAG)**: Instant incident containment SOPs with copy-paste CLI commands.\n\n"
-                "#### Example Directives:\n"
-                "- *Multi-vector Triage*: `Analyze IP 185.220.101.43 and query CVE-2024-3094`\n"
-                "- *Defense SOP*: `Provide SYN flood mitigation runbook` or `Ransomware outbreak containment`\n"
-                "- *Architecture Inquiry*: `Explain how the autoencoder detects anomalous packet flows`\n"
-                "- *Advisory*: `How do I secure an SSH server against brute force attacks?`\n"
-                "- *Log Analysis*: Paste raw syslog, auth.log, or firewall drop events directly into chat."
+                "### [CYBERSICKER ARSENAL] Available Blue-Team Security Tools\n\n"
+                "I am **Cybersicker**, an autonomous Blue-Team SOC Analyst and Incident Response Agent created by **Vrishin Ram.K**.\n\n"
+                "Here are my **5 primary security analysis tools**:\n\n"
+                "1. **Network Traffic Anomaly Scan (Keras Autoencoder)**\n"
+                "   - Evaluates network packet flows against the NSL-KDD baseline using a 16→8→16 deep neural autoencoder.\n"
+                "   - Detects zero-day network intrusions, volumetric surges, and anomalous packet flows using reconstruction Mean Squared Error (MSE) loss.\n"
+                "   - **Sample Directive**: `Scan KDDTrain+.txt`\n\n"
+                "2. **VirusTotal Threat Intelligence**\n"
+                "   - Live threat intelligence querying the VirusTotal v3 API.\n"
+                "   - Assesses global reputation for target IPv4 addresses, reports vendor detection ratios, scores malicious posture, and attributes ISP/ASN origins.\n"
+                "   - **Sample Directive**: `Analyze IP 185.220.101.43` or `Analyze IP 8.8.8.8`\n\n"
+                "3. **NIST NVD CVE Advisory**\n"
+                "   - Live vulnerability correlation using the NIST National Vulnerability Database (REST API 2.0).\n"
+                "   - Retrieves authoritative CVSS v3.1 base scores, exploitability/impact subscores, CWE weakness vectors, and remediation advisories.\n"
+                "   - **Sample Directive**: `Query CVE-2024-3094` or `Query CVE-2021-44228`\n\n"
+                "4. **Hardware OUI Resolution**\n"
+                "   - Layer 2 MAC address resolution via the IEEE Organizationally Unique Identifier (OUI) database.\n"
+                "   - Identifies hardware device manufacturers, profiles asset classes (IoT sensors, gateways, network NICs), and flags Locally Administered Addresses (LAA) / randomized MACs.\n"
+                "   - **Sample Directive**: `Resolve MAC B8:27:EB:AA:BB:CC`\n\n"
+                "5. **Consult Playbook (RAG)**\n"
+                "   - Autonomous incident response runbook retrieval powered by ChromaDB persistent vector search.\n"
+                "   - Delivers NIST CSF 2.0 and MITRE ATT&CK-aligned Standard Operating Procedures (SOPs) for incident containment with ready-to-run CLI commands (sysctl, iptables, ufw, switchport).\n"
+                "   - **Sample Directive**: `Provide SYN flood mitigation runbook` or `Ransomware outbreak containment`\n\n"
+                "---\n"
+                "#### Full Pipeline Execution:\n"
+                "You can trigger all 5 tools concurrently in a unified pipeline by clicking the **Run All Tools** button or entering:\n"
+                "`Execute full triage pipeline across all available threat vectors`"
             )
 
         # Check for Autoencoder / Anomaly detection inquiry

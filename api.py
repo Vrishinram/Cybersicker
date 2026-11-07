@@ -259,6 +259,7 @@ async def full_triage(req: FullTriageRequest):
             "verdict": "MALICIOUS" if is_critical else "CLEAN",
             "overall_status": overall_verdict,
             "scan": scan_data,
+            "scanner": scan_data,
             "ip": vt_data,
             "mac": oui_data,
             "cve": cve_data,
@@ -275,6 +276,12 @@ async def full_triage(req: FullTriageRequest):
     except Exception as e:
         logger.error("Full triage pipeline failed: %s", e)
         return ToolResponse(success=False, result=f"Full triage pipeline failed: {str(e)}")
+
+
+@app.post("/api/tools/all", response_model=ToolResponse)
+async def full_triage_all_alias(req: FullTriageRequest):
+    """Alias for /api/tools/full-triage to ensure cross-client compatibility."""
+    return await full_triage(req)
 
 
 # ═══════════════════════════════════════════════════════════════

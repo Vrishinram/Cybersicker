@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveMacOui } from "../oui";
+import { resolveCve } from "../cve";
 
 const CANDIDATE_IPV4_REGEX = /\b(?:\d{1,4}\.){3}\d{1,4}\b/g;
 const CVE_REGEX = /CVE-\d{4}-\d{4,7}/gi;
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(60000), // 60s timeout for local Ollama LLM generation
     });
     if (res.ok) {
       const data = await res.json();
@@ -52,47 +53,94 @@ export async function POST(req: Request) {
 
   const hasExplicitIndicators = extractedIps.length > 0 || extractedCves.length > 0 || extractedMacs.length > 0;
 
-  // 2. Greetings, Agent Identity & Capability Overview
-  const isGreeting =
+  // 2. Tools & Capabilities Inquiry (Bug Fix: explicitly list the 5 core tools)
+  const isToolsQuery =
     !hasExplicitIndicators &&
     [
-      "hello",
-      "hi",
-      "hey",
-      "greetings",
-      "who are you",
-      "what can you do",
+      "tool",
+      "tools",
+      "what tools",
+      "available tools",
+      "list tools",
+      "what are your tools",
+      "what do you have",
       "capabilities",
-      "about cybersicker",
-      "what is cybersicker",
-      "help",
+      "what can you do",
+      "show tools",
+      "arsenal",
       "commands",
     ].some((k) => msgLower.includes(k));
+
+  if (isToolsQuery) {
+    return NextResponse.json({
+      success: true,
+      response: `### [CYBERSICKER ARSENAL] Available Blue-Team Security Tools
+
+I am **Cybersicker**, an autonomous Blue-Team SOC Analyst and Incident Response Agent created by **Vrishin Ram.K**.
+
+Here are my **5 primary security analysis tools**:
+
+1. **Network Traffic Anomaly Scan (Keras Autoencoder)**
+   - **Engine:** 16→8→16 deep neural autoencoder trained on the NSL-KDD benchmark dataset.
+   - **Function:** Detects zero-day network intrusions, volumetric surges, and anomalous packet flows using reconstruction Mean Squared Error (MSE) loss with calibrated threshold filtering.
+   - **Sample Directive:** \`Scan KDDTrain+.txt\`
+
+2. **VirusTotal Threat Intelligence**
+   - **Engine:** VirusTotal v3 REST API.
+   - **Function:** Queries real-time global threat intelligence for remote IPv4 addresses, evaluates multi-engine detection ratios, classifies reputation (Clean, Suspicious, Malicious), and attributes ISP/ASN origins.
+   - **Sample Directive:** \`Analyze IP 185.220.101.43\` or \`Analyze IP 8.8.8.8\`
+
+3. **NIST NVD CVE Advisory**
+   - **Engine:** NIST National Vulnerability Database (REST API 2.0).
+   - **Function:** Correlates CVE identifiers to retrieve authoritative CVSS v3.1 base scores, exploitability/impact subscores, CWE weakness vectors, and remediation advisories.
+   - **Sample Directive:** \`Query CVE-2024-3094\` or \`Query CVE-2021-44228\`
+
+4. **Hardware OUI Resolution**
+   - **Engine:** IEEE Organizationally Unique Identifier (OUI) MAC database.
+   - **Function:** Resolves physical Layer 2 MAC addresses to registered hardware vendors, profiles device categories (IoT sensors, gateways, network NICs), and flags Locally Administered Addresses (LAA) / randomized MACs.
+   - **Sample Directive:** \`Resolve MAC B8:27:EB:AA:BB:CC\`
+
+5. **Consult Playbook (RAG)**
+   - **Engine:** ChromaDB Persistent Semantic Vector Store.
+   - **Function:** Retrieves NIST CSF 2.0 and MITRE ATT&CK-aligned Standard Operating Procedures (SOPs) for incident containment with ready-to-run CLI commands (sysctl, iptables, ufw).
+   - **Sample Directive:** \`Provide SYN flood mitigation runbook\` or \`Ransomware outbreak containment\`
+
+---
+
+#### Full Pipeline Execution:
+You can trigger all 5 tools concurrently in a unified pipeline by clicking the **Run All Tools** button or submitting:
+\`Execute full triage pipeline across all available threat vectors\``,
+    });
+  }
+
+  // 3. Greetings & Identity
+  const isGreeting =
+    !hasExplicitIndicators &&
+    /\b(hi|hello|hey|greetings|welcome|who are you|about cybersicker|what is cybersicker|help)\b/i.test(rawMessage);
 
   if (isGreeting) {
     return NextResponse.json({
       success: true,
       response: `### [CYBERSICKER SOC AGENT] Operational Briefing
 
-Greetings, Operator. I am **Cybersicker**, an autonomous Blue-Team SOC Analyst and Incident Response Agent created by **Vrishin Ram.K**.
+Greetings, Operator. I am **Cybersicker**, your autonomous Blue-Team SOC Analyst and Incident Response Agent created by **Vrishin Ram.K**.
 
-#### Active Defensive Capabilities:
-- **Real-Time Threat Intelligence (VirusTotal v3)**: Asynchronous IP reputation scoring, malicious engine counts, ISP/ASN attribution.
-- **Vulnerability Correlation (NIST NVD REST API 2.0)**: CVSS 3.1 base scoring, exploitability/impact vectors, CWE classification, vendor patches.
-- **Hardware MAC Profiling (IEEE OUI Engine)**: Layer 2 MAC resolution, hardware vendor identification, LAA/randomized MAC detection.
-- **Deep Network Anomaly Detection (In-Memory Autoencoder)**: 16→8→16 neural autoencoder trained on NSL-KDD packet flows with MSE reconstruction loss calculation.
-- **Contextual Playbook Retrieval (ChromaDB Semantic RAG)**: Incident containment SOPs aligned with NIST CSF and MITRE ATT&CK.
+I am on active monitoring duty with **5 integrated security analysis tools**:
+1. **Network Traffic Anomaly Scan (Keras Autoencoder)**
+2. **VirusTotal Threat Intelligence**
+3. **NIST NVD CVE Advisory**
+4. **Hardware OUI Resolution**
+5. **Consult Playbook (RAG)**
 
-#### Example Directives:
-- **Compound Triage**: \`Analyze IP 185.220.101.43 and query CVE-2024-3094\`
-- **Defense SOP**: \`Provide SYN flood mitigation runbook\` or \`Ransomware outbreak containment\`
-- **Architecture Query**: \`Explain how the autoencoder detects anomalous packet flows\`
-- **Host Hardening**: \`How do I secure an SSH server on port 22 against brute force attacks?\`
-- **Log Forensics**: Paste raw syslog, auth.log, or firewall drop events directly into the chat prompt.`,
+#### Quick Directives:
+- *Ask about tools:* \`What tools do you have available?\`
+- *Compound Triage:* \`Analyze IP 185.220.101.43 and query CVE-2024-3094\`
+- *Run All Tools:* Click the **Run All Tools** button above
+- *Defense Runbook:* \`Provide SYN flood mitigation runbook\``,
     });
   }
 
-  // 3. Log & Forensic Analysis (e.g., auth.log, syslog, web access logs)
+  // 4. Log & Forensic Analysis (e.g., auth.log, syslog, web access logs)
   const isLogSnippet = [
     "failed password",
     "accepted password",
@@ -154,7 +202,7 @@ ${containmentCommands}
     });
   }
 
-  // 4. Conceptual & Technical Inquiries (Autoencoders, MITRE, Zero Trust, etc.)
+  // 5. Conceptual & Technical Inquiries (Autoencoders, MITRE, Zero Trust, etc.)
   const isConceptual = [
     "explain",
     "how does",
@@ -225,7 +273,7 @@ Cybersicker automatically maps extracted indicators, ChromaDB playbooks, and aut
     });
   }
 
-  // 5. Host & Service Hardening Advisory (e.g., SSH, Port 22, Firewalls)
+  // 6. Host & Service Hardening Advisory (e.g., SSH, Port 22, Firewalls)
   const isHardening = [
     "harden",
     "secure",
@@ -276,7 +324,7 @@ sudo fail2ban-client status sshd
     });
   }
 
-  // 6. Full Spectrum Multi-Vector Triage
+  // 7. Full Spectrum Multi-Vector Triage
   const wantsAll = [
     "combine",
     "all tools",
@@ -290,8 +338,9 @@ sudo fail2ban-client status sshd
   if (wantsAll) {
     const ip = extractedIps[0] || "185.220.101.43";
     const cve = extractedCves[0] || "CVE-2024-3094";
-    const rawMac = extractedMacs[0] || "00:1A:2B:3C:4D:5E";
+    const rawMac = extractedMacs[0] || "B8:27:EB:AA:BB:CC";
     const resolvedMac = resolveMacOui(rawMac);
+    const resolvedCve = await resolveCve(cve);
 
     return NextResponse.json({
       success: true,
@@ -315,18 +364,12 @@ sudo fail2ban-client status sshd
 - **Suspicious Score:** ${ip === "8.8.8.8" || ip.startsWith("192.") ? "0" : "2"}
 
 #### 3. Vulnerability Correlation (NIST NVD 2.0)
-- **Vulnerability ID:** \`${cve}\`
-- **CVSS Base Score:** **10.0** (CRITICAL)
-- **Advisory Summary:** ${
-        cve === "CVE-2024-3094"
-          ? "Malicious backdoor in upstream tarballs of xz-utils (liblzma versions 5.6.0 and 5.6.1) intercepting OpenSSH sshd process authentication to allow unauthorized remote code execution."
-          : "Apache Log4j2 remote code execution vulnerability (Log4Shell)."
-      }
-- **Vendor Remediation:** ${
-        cve === "CVE-2024-3094"
-          ? "Immediately downgrade xz-utils to version 5.4.x and revoke SSH keys."
-          : "Upgrade to Log4j 2.17.1 or higher immediately."
-      }
+- **Vulnerability ID:** \`${resolvedCve.cve_id}\`
+- **CVSS Base Score:** **${resolvedCve.cvss_score}** (${resolvedCve.severity})
+- **Vector:** \`${resolvedCve.vector_string}\`
+- **Weakness:** ${resolvedCve.cwes.join(", ")}
+- **Advisory Summary:** ${resolvedCve.description}
+- **Vendor Remediation:** ${resolvedCve.recommendation}
 
 #### 4. Hardware Identity & Device Profiling (IEEE OUI)
 - **Interface MAC:** \`${resolvedMac.mac}\`
@@ -339,7 +382,7 @@ sudo fail2ban-client status sshd
 SOP-001: IoT Botnet Infection Response
 1. Reassign switch port or Wi-Fi BSSID to Quarantine VLAN 999.
 2. Blackhole malicious destination IP ${ip} at border BGP transit.
-3. Apply patch ${cve} across affected endpoint instances.
+3. Apply patch ${resolvedCve.cve_id} across affected endpoint instances.
 4. Export PCAP connection log for forensic chain of custody.
 \`\`\``,
     });
@@ -347,7 +390,7 @@ SOP-001: IoT Botnet Infection Response
 
   const sections: string[] = [];
 
-  // 7. Explicit Scan Request
+  // 8. Explicit Scan Request
   const wantsScan =
     !isConceptual &&
     ["scan", "autoencoder", "kdd", "anomaly", "anomalies", "traffic log", "packet scan"].some((k: string) => msgLower.includes(k));
@@ -362,7 +405,7 @@ SOP-001: IoT Botnet Infection Response
 - **Verdict:** **HIGH RISK**`);
   }
 
-  // 8. IP Reputation Check (VirusTotal)
+  // 9. IP Reputation Check (VirusTotal)
   const wantsIp = extractedIps.length > 0 || (msgLower.includes("ip") && msgLower.includes("check"));
   if (wantsIp) {
     const ipsToCheck = extractedIps.length > 0 ? extractedIps : ["185.220.101.43"];
@@ -396,39 +439,24 @@ SOP-001: IoT Botnet Infection Response
     }
   }
 
-  // 9. NIST CVE Vulnerability Lookup
-  const wantsCve = extractedCves.length > 0 || msgLower.includes("cve");
+  // 10. NIST CVE Vulnerability Lookup (Bug Fix: Accurate lookup for any CVE, especially CVE-2024-3094)
+  const wantsCve = extractedCves.length > 0 || (msgLower.includes("cve") && !isToolsQuery);
   if (wantsCve) {
     const cvesToCheck = extractedCves.length > 0 ? extractedCves : ["CVE-2024-3094"];
     for (const cveId of cvesToCheck) {
-      if (cveId === "CVE-2024-3094") {
-        sections.push(`### [VULNERABILITY REPORT] NIST NVD Advisory: CVE-2024-3094
+      const resolved = await resolveCve(cveId);
+      sections.push(`### [VULNERABILITY REPORT] NIST NVD Advisory: ${resolved.cve_id}
 
-- **Published Date:** 2024-03-29
-- **CVSS Base Score:** **10.0** (CRITICAL)
-- **Vector:** \`CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H\`
-- **Weakness:** CWE-506 (Embedded Malicious Code)
-- **Summary:** Malicious backdoor in upstream tarballs of xz-utils (liblzma versions 5.6.0 and 5.6.1) intercepting OpenSSH sshd process authentication to allow unauthorized remote code execution.
-- **Remediation:** Immediately downgrade xz-utils to version 5.4.x, terminate unauthorized SSH sessions, and revoke potentially compromised keys.`);
-      } else if (cveId === "CVE-2017-0144") {
-        sections.push(`### [VULNERABILITY REPORT] NIST NVD Advisory: CVE-2017-0144
-
-- **Published Date:** 2017-03-14
-- **CVSS Base Score:** **8.1** (HIGH)
-- **Summary:** Microsoft SMBv1 Remote Code Execution vulnerability exploited by EternalBlue and WannaCry.
-- **Remediation:** Disable SMBv1 globally and apply Microsoft MS17-010 security update.`);
-      } else {
-        sections.push(`### [VULNERABILITY REPORT] NIST NVD Advisory: ${cveId}
-
-- **Published Date:** 2021-12-10
-- **CVSS Base Score:** **10.0** (CRITICAL)
-- **Summary:** Apache Log4j2 JNDI remote code execution vulnerability (Log4Shell).
-- **Remediation:** Upgrade to Log4j 2.17.1+ or set log4j2.formatMsgNoLookups=true immediately.`);
-      }
+- **Published Date:** ${resolved.published}
+- **CVSS Base Score:** **${resolved.cvss_score}** (${resolved.severity})
+- **Vector:** \`${resolved.vector_string}\`
+- **Weakness:** ${resolved.cwes.join(", ")}
+- **Summary:** ${resolved.description}
+- **Remediation:** ${resolved.recommendation}`);
     }
   }
 
-  // 10. Hardware MAC Lookup (IEEE OUI)
+  // 11. Hardware MAC Lookup (IEEE OUI)
   const wantsMac = extractedMacs.length > 0 || (msgLower.includes("mac") && msgLower.includes("oui"));
   if (wantsMac) {
     const macsToCheck = extractedMacs.length > 0 ? extractedMacs : ["00:1A:2B:3C:4D:5E"];
@@ -443,7 +471,7 @@ SOP-001: IoT Botnet Infection Response
     }
   }
 
-  // 11. ChromaDB Playbook Semantic RAG
+  // 12. ChromaDB Playbook Semantic RAG
   const wantsPlaybook = [
     "playbook",
     "sop",
@@ -547,7 +575,7 @@ killall -9 suspicious_daemon
     });
   }
 
-  // 12. Dynamic SOC Operational Advisory for General Unmatched Prompts
+  // 13. Dynamic SOC Operational Advisory for General Unmatched Prompts
   return NextResponse.json({
     success: true,
     response: `### [SOC OPERATIONAL ADVISORY] Cybersicker Agent Response
@@ -556,11 +584,12 @@ killall -9 suspicious_daemon
 - **Directive Received:** *"${rawMessage}"*
 
 #### Blue-Team Assessment:
-I have analyzed your query within the context of current telemetry and security baselines. 
+I have analyzed your query within the context of current telemetry and security baselines.
 
 #### Recommended SOC Actions:
-1. **Indicator Enrichment**: If you have observed specific IP addresses, CVE IDs, or MAC addresses, submit them directly (e.g., \`Analyze IP 185.220.101.43 and query CVE-2024-3094\`).
-2. **Defensive Runbooks**: To retrieve immediate containment steps, specify the attack class (e.g., \`Provide SYN flood mitigation runbook\` or \`Ransomware containment procedures\`).
-3. **Telemetry & Log Inspection**: You can paste raw syslog, firewall drop events, or auth.log excerpts directly for real-time forensic parsing and containment advice.`,
+1. **Indicator Enrichment**: Submit specific IP addresses, CVE IDs, or MAC addresses (e.g., \`Analyze IP 185.220.101.43 and query CVE-2024-3094\`).
+2. **Explore Available Tools**: Type \`What tools do you have available?\` to view my 5 core defense modules.
+3. **Defensive Runbooks**: Specify an attack class (e.g., \`Provide SYN flood mitigation runbook\` or \`Ransomware containment procedures\`).
+4. **Telemetry & Log Inspection**: Paste raw syslog, firewall drop events, or auth.log excerpts directly for real-time forensic parsing and containment advice.`,
   });
 }

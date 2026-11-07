@@ -491,7 +491,7 @@ ${d.top_anomalous_endpoints?.length
   function formatToolResult(tool: string, data: Record<string, any>): string {
     switch (tool) {
       case "all": {
-        const scan = (data.scanner || {}) as Record<string, any>;
+        const scan = (data.scanner || data.scan || {}) as Record<string, any>;
         const ip = (data.ip || {}) as Record<string, any>;
         const cve = (data.cve || {}) as Record<string, any>;
         const mac = (data.mac || {}) as Record<string, any>;

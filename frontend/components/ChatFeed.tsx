@@ -180,7 +180,14 @@ export default function ChatFeed({
                 </p>
               </div>
             </div>
-            <button className="btn-primary text-xs py-1.5 px-3 shrink-0 ml-4 pointer-events-none">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRunFullPipeline();
+              }}
+              className="btn-primary text-xs py-1.5 px-3.5 shrink-0 ml-4 cursor-pointer hover:brightness-110 active:scale-95 transition-all shadow-md font-semibold"
+            >
               Run All Tools
             </button>
           </div>
