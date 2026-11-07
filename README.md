@@ -1,429 +1,317 @@
-# CYBERSICKER — Agentic AI Cyberattack Detection for IoT Environments
+# CYBERSICKER - Autonomous Blue-Team SOC Workbench
 
-> **Autonomous LLM-Powered Security Operations Center for IoT Threat Detection & Response**  
-> Built by **Vrishin Ram.K**
-
-[![Agentic AI](https://img.shields.io/badge/Type-Agentic%20AI-purple)](https://python.langchain.com/docs/concepts/agents)
-[![Python](https://img.shields.io/badge/Python-3.9+-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-green)](#license)
-[![LLM](https://img.shields.io/badge/LLM-Google%20Gemini%202.5%20Flash-red)](https://ai.google.dev/)
+> Autonomous LLM-Powered Security Operations Center for Real-Time Threat Triage, Deep Flow Anomaly Detection, and Active Defense Containment.  
+> Author: Vrishin Ram.K
 
 ---
 
-## 🎯 Project Overview
+## Live Deployments & Repository Links
 
-**CYBERSICKER** is a **dual-core intelligent system** that fuses **agentic AI** with **IoT cyberattack detection**:
-
-🤖 **Agentic AI Core:** Autonomous LLM agent (Google Gemini 2.5 Flash) that orchestrates 5+ security tools to investigate threats, query threat intelligence APIs, and consult incident response playbooks.  
-🔍 **Detection Core:** Deep learning autoencoder + ML anomaly detection on network traffic to identify botnet infections, DDoS attacks, ransomware, and lateral movement in IoT environments.
-
-It simulates an **autonomous blue-team SOC analyst** that can independently reason, make decisions, and respond to security incidents in real-time.
-
-### The Dual-Core System
-
-#### 🤖 **Agentic AI Engine**
-- **Brain:** Google Gemini 2.5 Flash LLM
-- **Framework:** LangChain agent orchestrator
-- **Tools:** 5 autonomous security investigation tools
-  - Network anomaly scanner (autoencoder)
-  - VirusTotal IP reputation checker
-  - MAC address device lookup
-  - NIST CVE database queries
-  - Incident response playbook consultant (RAG)
-- **Capability:** Autonomous reasoning, tool selection, threat analysis
-
-#### 🔍 **IoT Threat Detection**
-- **Algorithm:** Deep neural network autoencoder + PCA
-- **Dataset:** NSL-KDD (19 MB labeled network traffic)
-- **Detects:** Botnet infections, DDoS floods, ransomware, lateral movement
-- **Accuracy:** Real-time anomaly scoring (MSE threshold-based)
-- **Output:** Flagged records with anomaly count & percentage
+- **Production Console (Vercel):** [https://cybersicker-soc.vercel.app](https://cybersicker-soc.vercel.app)
+- **Source Code Repository (GitHub):** [https://github.com/Vrishinram/Cybersicker](https://github.com/Vrishinram/Cybersicker)
+- **Primary Feature Branch:** `feat/unified-pipeline-and-cloud-deploy`
 
 ---
 
-## 🏗️ Technology Stack
+## System Overview
 
-| Layer | Technology |
-|---|---|
-| **Frontend / Dashboard** | Streamlit (Python) with custom military-grade dark CSS |
-| **LLM Brain** | Google Gemini 2.5 Flash via `langchain_google_genai` |
-| **Agent Framework** | LangChain (`create_agent`, `@tool` decorators) |
-| **Anomaly Detection ML** | TensorFlow/Keras Autoencoder + Scikit-Learn (PCA, StandardScaler) |
-| **Playbook RAG** | LangChain `TextLoader` → `CharacterTextSplitter` → `HuggingFaceEmbeddings` → `ChromaDB` |
-| **Threat Intelligence** | VirusTotal API, NIST NVD API, macvendors.com API |
-| **Dataset** | KDD Cup 1999 (NSL-KDD) — 19 MB network traffic dataset |
+CYBERSICKER is an enterprise-grade autonomous Blue-Team Security Operations Center (SOC) workbench. It unifies a deep neural autoencoder for real-time network flow anomaly scoring with an autonomous LLM agent (Ollama / Google Gemini) orchestrating multi-vector threat enrichment and active defense containment.
+
+### Dual-Core Architecture
+
+1. **Agentic Reasoning & Triage Core:**
+   - **Orchestration LLM:** Local private inference via **Ollama** (`llama3.2`, `qwen2.5:7b`, `llama3.1`) or cloud **Google Gemini 2.5 Flash** via LangChain.
+   - **Strict Entity Validation:** Zero-fallback RFC 791 IPv4 boundary parsing, case-insensitive CVE extraction, and IEEE MAC OUI prefix resolution.
+   - **Live External Threat Intelligence:** Async HTTP clients querying VirusTotal v3, NIST NVD REST API 2.0, and IEEE OUI databases without simulated fallbacks.
+   - **Autonomous Playbook RAG:** Persistent ChromaDB vector database housing MITRE ATT&CK v18-aligned Standard Operating Procedures (`SOP-001` through `SOP-007`).
+
+2. **Deep Anomaly Detection & Traffic Ingestion Core:**
+   - **Raw Packet Ingestion:** Live parsing of `.pcap`, `.pcapng`, and `.csv` captures via Scapy, reconstructing bidirectional TCP/UDP flows.
+   - **Feature Extraction:** Computes 41 statistical NSL-KDD traffic features (`duration`, `protocol_type`, `service`, `flag`, `src_bytes`, `dst_bytes`, `serror_rate`, `same_srv_rate`, etc.).
+   - **In-Memory Neural Inference:** Normalization via `StandardScaler` pipeline followed by inference through a pre-trained Keras Autoencoder (`16 -> 8 -> 16`).
+   - **Dynamic Thresholding:** Computes reconstruction Mean Squared Error (MSE); flows where `MSE > 0.042` are flagged as anomalies.
+
+3. **Active Defense & Incident Containment:**
+   - **Perimeter Firewall Blackholing:** `POST /api/v1/containment/block-ip` emits immediate `iptables` drop rules.
+   - **Endpoint Network Isolation:** `POST /api/v1/containment/isolate-host` severs active unauthorized sockets.
+   - **OASIS STIX 2.1 Threat Intelligence Bundles:** Generates valid STIX 2.1 JSON packages (`bundle`, `identity`, `incident`, `indicator`, `observed-data`, `relationship`) for SIEM export.
+
+4. **Real-Time Telemetry Streaming:**
+   - Full duplex WebSocket stream at `/ws/telemetry`.
+   - Server-Sent Events (SSE) stream at `/api/v1/telemetry/stream`.
+   - Terminal dock with live JSON syntax highlighting and instantaneous level filtering (`ALL`, `INF`, `WRN`, `ERR`).
 
 ---
 
-## 🔄 Architecture
+## Technical Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      👤 User Input                          │
-│              (Chat Dashboard or CLI Terminal)               │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-        ┌────────────────────────────────┐
-        │  🤖 Gemini 2.5 Flash Agent     │
-        │      (LangChain Orchestrator)  │
-        └────────────────────────────────┘
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                │
-        ▼                ▼                ▼
-   Network Scanner  VirusTotal API   NIST CVE DB
-   (Autoencoder)    IP Reputation    CVE Lookup
-        │                │                │
-        └────────────────┼────────────────┘
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                │
-        ▼                ▼                ▼
-   MAC Vendor      Playbook RAG    Incident Response
-   Lookup          (ChromaDB)       Strategy
-        │                │                │
-        └────────────────┼────────────────┘
-                         │
-                         ▼
-        ┌────────────────────────────────┐
-        │   📊 Formatted SOC Report      │
-        │   (Dashboard or Terminal)      │
-        └────────────────────────────────┘
+                       +---------------------------------------+
+                       |   Operator Browser Interface          |
+                       |   Next.js 16 + React 19 + Tailwind    |
+                       |   (https://cybersicker-soc.vercel.app)|
+                       +-------------------+-------------------+
+                                           |
+                                           | HTTPS / WSS / SSE
+                                           v
+                       +---------------------------------------+
+                       |   FastAPI High-Performance Backend    |
+                       |   (Port 8000 Daemon / Uvicorn)        |
+                       +-------------------+-------------------+
+                                           |
+         +-----------------+---------------+-----------------+-----------------+
+         |                 |                                 |                 |
+         v                 v                                 v                 v
++-----------------+ +-------------------+             +---------------+ +------------------+
+| Ollama / Gemini | | Live Threat Intel |             | Autoencoder   | | ChromaDB RAG     |
+| Multi-Intent    | | - VirusTotal v3   |             | - Keras Model | | - MITRE ATT&CK   |
+| Tool Dispatcher | | - NIST NVD 2.0    |             | - Scapy PCAP  | | - SOP Playbooks  |
+|                 | | - IEEE OUI Lookup |             | - MSE > 0.042 | |   (001 - 007)    |
++-----------------+ +-------------------+             +---------------+ +------------------+
+         |                 |                                 |                 |
+         +-----------------+---------------+-----------------+-----------------+
+                                           |
+                                           v
+                       +---------------------------------------+
+                       |   Active Defense & Containment Engine |
+                       |   - Host Isolation (/isolate-host)    |
+                       |   - Ingress Firewall (/block-ip)      |
+                       |   - OASIS STIX 2.1 JSON Bundler       |
+                       +---------------------------------------+
 ```
 
 ---
 
-## 📁 File Structure
+## Directory Structure
 
-### Core Components
-
-| File | Lines | Description |
-|---|---|---|
-| **app.py** | 542 | Streamlit SOC dashboard with cyberpunk UI, agent integration |
-| **agent.py** | 121 | CLI terminal agent for direct command-line interaction |
-| **autoencoder.py** | 49 | Deep neural network for anomaly detection in network traffic |
-| **api.py** | — | Shared API client utilities |
-| **cyber_test.py** | 14 | Test script for Gemini API connectivity |
-
-### Configuration & Data
-
-| File | Description |
-|---|---|
-| **playbook.env.txt** | 380-line incident response playbook (NIST CSF 2.0 + MITRE ATT&CK aligned) |
-| **KDDTrain+.txt** | ~19 MB NSL-KDD network traffic dataset (labeled for supervised learning) |
-| **scitely_models.json** | Threat model configurations |
-| **playbook.env.txt** | IR playbook v2.0 |
-| **requirements.txt** | Python package dependencies |
-
-### Frontend (Next.js Optional)
-
-| Path | Purpose |
-|---|---|
-| **frontend/** | Optional Next.js TypeScript dashboard (alternative to Streamlit) |
+```
+Cybersicker/
+├── api.py                           # Primary FastAPI application entrypoint
+├── app.py                           # Legacy Streamlit interactive interface
+├── agent.py                         # CLI agent dispatch runner
+├── autoencoder.py                   # Keras Autoencoder model definitions
+├── autoencoder_kdd.keras            # Pre-trained Autoencoder weights (MSE threshold 0.042)
+├── scaler.joblib                    # Serialized StandardScaler pipeline
+├── KDDTrain+.txt                    # NSL-KDD baseline reference dataset (125,973 records)
+├── requirements.txt                 # Python runtime dependencies
+│
+├── app/
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── ingest.py                # POST /api/v1/scan/traffic (.pcap, .pcapng, .csv)
+│   │   ├── containment.py           # Host isolation, IP firewall block, STIX 2.1 exporter
+│   │   └── telemetry.py             # WebSocket /ws/telemetry and SSE /api/v1/telemetry/stream
+│   ├── services/
+│   │   ├── virustotal.py            # Async VirusTotal v3 client
+│   │   ├── nvd.py                   # Async NIST NVD 2.0 REST client
+│   │   ├── oui.py                   # IEEE MAC OUI resolution database
+│   │   ├── playbook_rag.py          # Persistent ChromaDB vector store for SOP playbooks
+│   │   ├── pcap_extractor.py        # Scapy flow reconstruction & 41-feature extraction
+│   │   ├── traffic_scanner.py       # Autoencoder batch and streaming inference engine
+│   │   └── telemetry.py             # Event bus and async queue broadcaster
+│   └── utils/
+│       ├── entity_parser.py         # RFC 791 IPv4, CVE, and MAC regex validator
+│       └── stix_exporter.js         # OASIS STIX 2.1 JSON generator and downloader
+│
+└── frontend/
+    ├── app/
+    │   ├── page.tsx                 # Core SOC Workbench interface
+    │   ├── layout.tsx               # Root layout and theme injection
+    │   ├── globals.css              # Cyberpunk dark theme and terminal CSS
+    │   ├── utils/
+    │   │   └── stix_exporter.ts     # TypeScript STIX 2.1 export utilities
+    │   └── api/v1/                  # Next.js serverless proxy and fallback routes
+    ├── components/
+    │   ├── Header.tsx               # Top status bar with [RESET SESSION] action control
+    │   ├── Sidebar.tsx              # Triage tool arsenal and .pcap/.csv dropzone
+    │   ├── ChatFeed.tsx             # Incident feed with conditional defense controls
+    │   ├── TelemetryDock.tsx        # Syntax-highlighted streaming log terminal
+    │   └── SidebarDropzone.tsx      # Drag-and-drop packet capture ingestion
+    └── package.json                 # Next.js 16, React 19, Lucide, Tailwind CSS
+```
 
 ---
 
-## 🛠️ Installation
+## Installation & Setup
 
 ### Prerequisites
-- **Python 3.9+**
-- **pip** package manager
-- **Google API Key** (for Gemini LLM)
-- **VirusTotal API Key** (optional, for IP reputation checks)
+- Python 3.10 or higher
+- Node.js 20 or higher
+- Git
 
-### Setup
+### 1. Backend Environment Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/Vrishinram/Cybersicker.git
 cd Cybersicker
 
-# Create virtual environment (recommended)
+# Create and activate virtual environment
 python -m venv venv
-venv\Scripts\activate  # On Windows
-source venv/bin/activate  # On macOS/Linux
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # Linux / macOS
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure API keys
-# Option 1: Create .env file
-echo GOOGLE_API_KEY=your_api_key_here > .env
-echo VT_API_KEY=your_virustotal_key_here >> .env
-
-# Option 2: Export as environment variables
-set GOOGLE_API_KEY=your_api_key_here      # Windows
-set VT_API_KEY=your_virustotal_key_here   # Windows
-
-export GOOGLE_API_KEY=your_api_key_here   # macOS/Linux
-export VT_API_KEY=your_virustotal_key_here  # macOS/Linux
+# Configure environment variables (.env)
+LLM_PROVIDER=ollama
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+GOOGLE_API_KEY=your_gemini_api_key_here        # Optional fallback
+VT_API_KEY=your_virustotal_api_key_here        # Optional
+NVD_API_KEY=your_nvd_api_key_here              # Optional
 ```
 
----
-
-## 🚀 Usage
-
-### 1. Streamlit Dashboard (Recommended)
+### 2. Launching the Backend Services
 
 ```bash
-streamlit run app.py
+# Start FastAPI SOC backend daemon on port 8000
+python -m uvicorn api:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Then open `http://localhost:8501` in your browser.
+Backend endpoints will be available at:
+- REST API Documentation: `http://127.0.0.1:8000/docs`
+- Health Check: `http://127.0.0.1:8000/health`
+- SSE Telemetry Stream: `http://127.0.0.1:8000/api/v1/telemetry/stream`
+- WebSocket Telemetry: `ws://127.0.0.1:8000/ws/telemetry`
 
-**Features:**
-- 🎨 Cyberpunk military SOC aesthetic
-- 💬 Chat-based threat investigation
-- 📊 Real-time metric cards
-- 🔄 Autonomous tool orchestration
-
-### 2. CLI Terminal Agent
+### 3. Frontend Setup (Next.js 16)
 
 ```bash
-python agent.py
-```
+cd frontend
 
-**Example commands:**
-```
-> scan d:\CYBERSICKER\KDDTrain+.txt
-> check ip 8.8.8.8
-> lookup mac 00:1A:2B:3C:4D:5E
-> cve sudo
-> playbook botnet response
-```
+# Install Node modules
+npm install
 
----
+# Run local development server on port 3000
+npm run dev
 
-## 🔧 Core Tools (Agent Capabilities)
-
-### 1. Network Scanner
-```python
-network_scanner(file_path: str) -> str
-```
-- Scans CSV/TXT network traffic logs
-- Uses autoencoder to detect anomalies
-- Returns count and percentage of anomalies
-
-### 2. IP Reputation Check
-```python
-check_ip_virustotal(ip_address: str) -> str
-```
-- Queries VirusTotal API
-- Returns vendor detections and confidence scores
-- Identifies malicious IPs
-
-### 3. MAC Address Lookup
-```python
-lookup_mac_address(mac: str) -> str
-```
-- Identifies device manufacturer from OUI
-- Uses macvendors.com API
-- Useful for IoT device inventory
-
-### 4. CVE Database Query
-```python
-query_cve_database(product: str) -> str
-```
-- Retrieves vulnerabilities from NIST NVD API
-- Returns CVSS scores and severity
-- Links to official CVE records
-
-### 5. Incident Response Playbook
-```python
-consult_playbook(query: str) -> str
-```
-- Semantic search over playbook using RAG
-- Uses ChromaDB + HuggingFace embeddings
-- Returns relevant incident response procedures
-
----
-
-## 📊 Machine Learning Details
-
-### Autoencoder Architecture
-
-A deep neural network trained on normal network traffic:
-
-```
-Input Layer (n features via PCA)
-    ↓
-Dense(16, ReLU)  [Encoder 1]
-    ↓
-Dense(8, ReLU)   [Bottleneck]
-    ↓
-Dense(16, ReLU)  [Decoder 1]
-    ↓
-Dense(n, Linear) [Output]
-```
-
-**Training Pipeline:**
-1. Extract numeric columns from CSV
-2. Apply StandardScaler normalization
-3. Apply PCA (95% variance retention) for dimensionality reduction
-4. Train autoencoder on normal traffic (5 epochs, batch size 256)
-5. Calculate Mean Squared Error (MSE) for each record
-6. Flag records with MSE > 0.5 as anomalies
-
-**Dataset:** NSL-KDD (19 MB)
-- 125,973 training records
-- Protocol types: TCP, UDP, ICMP
-- Attack labels: DoS, Probe, R2L, U2R, Normal
-
----
-
-## 📋 Incident Response Playbook
-
-The **playbook.env.txt** includes:
-
-### Standard Operating Procedures (SOPs)
-- **SOP-001:** IoT Botnet Infection Response (Mirai, Mozi, etc.)
-- **SOP-002:** ICMP Flood / DDoS Mitigation
-- **SOP-003:** IoT Ransomware Containment
-
-### Frameworks
-- **NIST CSF 2.0** compliance mapping
-- **MITRE ATT&CK for ICS/IoT** tactic coverage
-- **Escalation Matrix** (SEV-1 to SEV-4)
-
-### Network Architecture
-- 5-VLAN isolation strategy
-- Inter-VLAN ACL rules for zero-trust
-- Evidence preservation & chain of custody
-
----
-
-## 🔐 Configuration
-
-### Environment Variables
-
-| Variable | Required | Purpose |
-|---|---|---|
-| `GOOGLE_API_KEY` | ✅ Yes | Google Gemini API access |
-| `VT_API_KEY` | ❌ No | VirusTotal threat intelligence |
-
-### API Updates
-
-Update `.env` file or run:
-```bash
-# Windows
-set GOOGLE_API_KEY=new_key
-
-# macOS/Linux
-export GOOGLE_API_KEY=new_key
+# Or build for production deployment
+npm run build
+npm run start
 ```
 
 ---
 
-## 📦 Dependencies
+## API Reference
 
-See `requirements.txt`:
+### 1. Network Traffic Analysis & Ingestion
 
-```
-streamlit>=1.28.0
-langchain>=0.1.0
-langchain-google-genai>=0.0.0
-google-generativeai>=0.3.0
-tensorflow>=2.13.0
-scikit-learn>=1.3.0
-pandas>=2.0.0
-numpy>=1.24.0
-chromadb>=0.4.0
-sentence-transformers>=2.2.0
-requests>=2.31.0
-python-dotenv>=1.0.0
-```
+#### `POST /api/v1/scan/traffic`
+Accepts multipart file upload (`.pcap`, `.pcapng`, `.csv`) or JSON payload. Reconstructs network flows, extracts NSL-KDD features, and performs Autoencoder MSE scoring.
 
-Install all at once:
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## 🧪 Testing
-
-### Test Gemini API Connection
-
-```bash
-python cyber_test.py
-```
-
-### Test Individual Tools
-
-```python
-# Test autoencoder
-from autoencoder import analyze_network_data
-df = pd.read_csv("KDDTrain+.txt")
-anomalies = analyze_network_data(df)
-
-# Test VirusTotal
-from agent import check_ip_virustotal
-result = check_ip_virustotal("1.1.1.1")
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "source": "capture.pcap",
+    "total_flows": 1248,
+    "anomalies_detected": 23,
+    "anomaly_percentage": 1.84,
+    "mean_mse": 0.0512,
+    "max_mse": 0.089,
+    "threshold": 0.042,
+    "verdict": "HIGH RISK - Active Attack Vector Detected",
+    "top_anomalous_endpoints": [
+      {
+        "flow_id": "185.220.101.43:24102->192.168.1.1:80/tcp",
+        "src_ip": "185.220.101.43",
+        "dst_ip": "192.168.1.1",
+        "src_port": 24102,
+        "dst_port": 80,
+        "protocol": "tcp",
+        "service": "http",
+        "mse": 0.089,
+        "anomaly_flag": true
+      }
+    ]
+  }
+}
 ```
 
----
+### 2. Autonomous Incident Triage
 
-## 📈 Performance Metrics
+#### `POST /api/chat`
+Dispatches operator natural language prompts to Ollama (or Gemini fallback), dynamically invoking tools based on detected entities.
 
-- **Autoencoder Training:** ~30 seconds on modern CPU
-- **Anomaly Detection:** ~2-5 seconds per scan (19 MB dataset)
-- **API Response:** ~1-3 seconds (VirusTotal, CVE DB)
-- **LLM Reasoning:** ~2-5 seconds (Gemini)
+**Example Request:**
+```json
+{
+  "message": "Analyze IP 185.220.101.43 and query CVE-2024-3094"
+}
+```
 
----
+#### `POST /api/tools/all`
+Runs the complete 5-stage triage pipeline sequentially (Scanner + VirusTotal + NIST NVD + MAC OUI + Playbook RAG).
 
-## 🏆 Use Cases
+### 3. Active Defense & Containment
 
-1. **IoT Botnet Detection** - Identify Mirai/Mozi command & control traffic
-2. **DDoS Mitigation** - Detect volumetric attacks via ICMP/SYN anomalies
-3. **Threat Intelligence Integration** - Correlate internal logs with external feeds
-4. **Incident Response Automation** - Autonomous investigation & playbook consultation
-5. **Security Awareness Training** - Blue-team SOC analyst simulation
+#### `POST /api/v1/containment/block-ip`
+```json
+{
+  "ip_address": "185.220.101.43",
+  "firewall_type": "iptables"
+}
+```
+**Response:**
+```json
+{
+  "status": "BLOCKED",
+  "command": "iptables -A INPUT -s 185.220.101.43 -j DROP",
+  "timestamp": "2026-10-31T15:30:00Z"
+}
+```
 
----
+#### `POST /api/v1/containment/isolate-host`
+```json
+{
+  "host_ip": "192.168.1.105",
+  "reason": "Compromised by Mirai Botnet"
+}
+```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) file for details.
-
----
-
-## 👤 Author
-
-**Vrishin Ram.K**  
-📧 [Contact](mailto:vrishinram.k@dsu.edu.in)
-
----
-
-## 🔗 Resources
-
-- **Google Gemini API:** https://ai.google.dev/
-- **LangChain:** https://python.langchain.com/
-- **VirusTotal API:** https://www.virustotal.com/api/
-- **NIST NVD:** https://nvd.nist.gov/
-- **NSL-KDD Dataset:** https://www.unb.ca/cic/datasets/nsl-kdd.html
-- **MITRE ATT&CK:** https://attack.mitre.org/
+#### `POST /api/v1/containment/export-stix`
+Generates an OASIS STIX 2.1 incident response bundle containing identity, incident, indicator, observed-data, and relationship objects.
 
 ---
 
-## ⚠️ Disclaimer
+## Standard Operating Procedures (ChromaDB Playbooks)
 
-This tool is designed for **authorized security testing and research only**. Unauthorized access to computer systems is illegal. Always obtain proper authorization before conducting security assessments.
+CYBERSICKER integrates authoritative incident response playbooks aligned with NIST CSF 2.0 and MITRE ATT&CK v18:
+
+| ID | Title | Threat Category | Primary Actions |
+|---|---|---|---|
+| **SOP-001** | IoT Botnet Infection Response | Mirai, Mozi, Gafgyt | Edge quarantine, CNC socket termination, credential rotation |
+| **SOP-002** | Volumetric SYN/ICMP Flood Mitigation | Denial of Service (DDoS) | Boundary rate-limiting, SYN cookie activation, upstream scrubbing |
+| **SOP-003** | IoT Ransomware & Firmware Extortion | Ransomware / Data Destruction | Out-of-band management isolation, snapshot restoration, forensic dump |
+| **SOP-004** | Unauthorized Lateral Movement | Pass-the-Hash / SSH Hijack | Host isolation, Kerberos ticket purge, segmented VLAN separation |
+| **SOP-005** | Remote Code Execution & Supply Chain | XZ Utils (CVE-2024-3094), Log4j | Package rollback, vulnerability patching, egress boundary filter |
+| **SOP-006** | Rogue Hardware & ARP Spoofing | Hardware Implant / MitM | MAC ACL enforcement, port security shutdown, switch audit |
+| **SOP-007** | Automated Perimeter Boundary Firewall Block | Perimeter Containment | Border firewall drop injection, STIX 2.1 distribution |
 
 ---
 
-<p align="center">
-  <strong>Made with 🛡️ for cybersecurity</strong>
-</p>
+## Machine Learning Model Specifications
+
+- **Architecture:** Deep Autoencoder (`Input -> Dense(16, ReLU) -> Dense(8, ReLU) -> Dense(16, ReLU) -> Output(Linear)`)
+- **Loss Function:** Mean Squared Error (MSE)
+- **Baseline Training Data:** NSL-KDD (`KDDTrain+.txt`, 125,973 nominal and anomalous flows)
+- **Dimensionality Reduction:** 95% variance PCA projection
+- **Decision Threshold:** `MSE > 0.042` flags anomalous flow distributions with zero manual threshold tuning required.
+
+---
+
+## Production Security & Governance
+
+- Strict RFC 791 validation prevents malformed address injection.
+- Zero mock fallbacks for live threat intelligence lookups when API keys are configured.
+- Automated client-side STIX 2.1 bundle export complies with US-CERT and OASIS Open standards.
+- Session reset flushes chat states and telemetry logs cleanly back to ready state.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

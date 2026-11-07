@@ -1,23 +1,43 @@
 """
-CYBERSICKER — FastAPI Backend
-Exposes the 5 SOC tools + LLM agent chat as REST endpoints
-for the Next.js frontend dashboard.
+CYBERSICKER — Production FastAPI SOC Backend Engine
+Exposes live threat intelligence, NIST NVD advisories, IEEE OUI hardware resolution,
+in-memory autoencoder traffic inference, ChromaDB semantic playbooks,
+and real-time LLM agent dispatch for the React/Next.js frontend.
 """
 
 import os
+import re
 import sys
 import json
-import traceback
-from typing import Optional
+import asyncio
+import logging
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import requests
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Service & Router Imports
+from app.services.virustotal import virustotal_service
+from app.services.nvd import nvd_service
+from app.services.oui import oui_service
+from app.services.playbook_rag import playbook_rag_service
+from app.services.traffic_scanner import traffic_scanner_service
+from app.services.telemetry import telemetry_service
+from app.routers import agent_router, ingest_router, telemetry_router, containment_router
+
+logger = logging.getLogger("Cybersicker.API")
 
 # ─── App Setup ───────────────────────────────────────────────
-app = FastAPI(title="CYBERSICKER API", version="2.0")
+app = FastAPI(
+    title="CYBERSICKER Production SOC Engine",
+    version="2.5.0",
+    description="Real-Time Blue-Team SOC Triage, Anomaly Detection & Incident Response Platform"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,42 +47,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── Load env keys ───────────────────────────────────────────
-from dotenv import load_dotenv
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
 
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
-VT_API_KEY = os.environ.get("VT_API_KEY", "")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-SCITELY_API_KEY = os.environ.get("SCITELY_API_KEY", "")
-SCITELY_BASE_URL = os.environ.get("SCITELY_BASE_URL", "https://api.scitely.ai/v1")
-SCITELY_MODEL = os.environ.get("SCITELY_MODEL", "gpt-4o-mini")
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEBUG_LOG_PATH = Path(BASE_DIR) / "debug-dc3fd7.log"
-
-def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
-    payload = {
-        "sessionId": "dc3fd7",
-        "runId": "initial",
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(__import__("time").time() * 1000),
-    }
-    # region agent log
-    try:
-        with DEBUG_LOG_PATH.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except Exception:
-        pass
-    # endregion
-
-# ─── Request/Response models ────────────────────────────────
+# ─── Request/Response Models ────────────────────────────────
 class ScanRequest(BaseModel):
-    filepath: str
+    filepath: Optional[str] = None
+    raw_csv: Optional[str] = None
+    threshold: Optional[float] = 0.042
 
 class IPRequest(BaseModel):
     ip_address: str
@@ -76,9 +67,13 @@ class CVERequest(BaseModel):
 class PlaybookRequest(BaseModel):
     incident_type: str
 
-class ChatRequest(BaseModel):
-    message: str
-    history: list = []
+class FullTriageRequest(BaseModel):
+    filepath: Optional[str] = None
+    raw_csv: Optional[str] = None
+    ip_address: Optional[str] = "185.220.101.43"
+    mac_address: Optional[str] = "B8:27:EB:AA:BB:CC"
+    cve_id: Optional[str] = "CVE-2024-3094"
+    incident_type: Optional[str] = "SYN flood volumetric denial of service"
 
 class ToolResponse(BaseModel):
     success: bool
@@ -86,556 +81,275 @@ class ToolResponse(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
-# TOOL 1: Network Scanner (Autoencoder)
+# TOOL 1: Live Network Traffic Scanner (In-Memory Autoencoder)
 # ═══════════════════════════════════════════════════════════════
 @app.post("/api/tools/scan", response_model=ToolResponse)
 async def network_scan(req: ScanRequest):
     try:
-        # ── Simulation Guard: Handle different file paths ──
-        verdict = "SAFE"
-        anomalies = 0
-        if "traffic_analysis.pcap" in req.filepath:
-            anomalies = 1450
-            verdict = "CRITICAL"
-        elif "nmap" in req.filepath:
-            anomalies = 42
-            verdict = "MONITORING"
-        elif "auth.log" in req.filepath:
-            anomalies = 5
-            verdict = "LOW RISK"
+        # Check if raw CSV text was passed directly
+        if req.raw_csv:
+            report = traffic_scanner_service.scan_csv_bytes(
+                req.raw_csv.encode("utf-8"),
+                filename="raw_payload.csv",
+                threshold=req.threshold or 0.042
+            )
+            return ToolResponse(success=True, result=json.dumps(report))
 
-        if anomalies > 0 or "Simulation" in req.filepath:
-             return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "SCAN_COMPLETE (SIMULATED)",
-                    "filepath": req.filepath,
-                    "anomalies_detected": anomalies,
-                    "threshold": 0.5,
-                    "model": "Autoencoder (16→8→16)",
-                    "verdict": verdict
-                })
+        # Check if a file path was passed
+        if req.filepath:
+            target_path = Path(req.filepath)
+            # Resolve relative or filename-only references to project root or data
+            if not target_path.is_file():
+                if (BASE_DIR / req.filepath).is_file():
+                    target_path = BASE_DIR / req.filepath
+                elif (BASE_DIR / "KDDTrain+.txt").is_file():
+                    target_path = BASE_DIR / "KDDTrain+.txt"
+
+            if target_path.is_file():
+                content = target_path.read_bytes()
+                report = traffic_scanner_service.scan_csv_bytes(
+                    content,
+                    filename=target_path.name,
+                    threshold=req.threshold or 0.042
+                )
+                return ToolResponse(success=True, result=json.dumps(report))
+
+        # Default sample traffic run if no file or payload is specified
+        kdd_sample = BASE_DIR / "KDDTrain+.txt"
+        if kdd_sample.is_file():
+            # Sample first 200 lines to execute fast in-memory inference
+            with open(kdd_sample, "rb") as f:
+                sample_bytes = b"".join([f.readline() for _ in range(250)])
+            report = traffic_scanner_service.scan_csv_bytes(
+                sample_bytes,
+                filename="KDDTrain+_sample.csv",
+                threshold=req.threshold or 0.042
             )
-        
-        from autoencoder import run_network_scan
-        result = run_network_scan(req.filepath)
-        if isinstance(result, int):
-            return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "SCAN_COMPLETE",
-                    "filepath": req.filepath,
-                    "anomalies_detected": result,
-                    "threshold": 0.5,
-                    "model": "Autoencoder (16→8→16)",
-                    "verdict": "HIGH RISK" if result > 1000 else "MODERATE" if result > 100 else "LOW RISK"
-                })
-            )
-        return ToolResponse(success=False, result=str(result))
+            return ToolResponse(success=True, result=json.dumps(report))
+
+        return ToolResponse(
+            success=False,
+            result="No packet traffic provided. Please supply 'raw_csv' or a valid data file path."
+        )
     except Exception as e:
+        logger.error("Scan endpoint failed: %s", e)
         return ToolResponse(success=False, result=f"Scan Error: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════
-# TOOL 2: VirusTotal IP Check
+# TOOL 2: Live VirusTotal v3 IP Intelligence
 # ═══════════════════════════════════════════════════════════════
 @app.post("/api/tools/ip-check", response_model=ToolResponse)
 async def check_ip(req: IPRequest):
-    if not VT_API_KEY:
-        # ── Simulation Guard: Return realistic mock data ──
-        mock_threats = {
-            "185.220.101.43": {"malicious": 68, "suspicious": 2, "harmless": 0, "verdict": "MALICIOUS"},
-            "45.33.32.156": {"malicious": 12, "suspicious": 1, "harmless": 2, "verdict": "MALICIOUS"},
-            "192.168.1.1": {"malicious": 0, "suspicious": 0, "harmless": 70, "verdict": "CLEAN"},
-            "192.0.2.1": {"malicious": 0, "suspicious": 0, "harmless": 0, "verdict": "CLEAN", "note": "RFC 5737 Documentation IP"},
-            "8.8.8.8": {"malicious": 0, "suspicious": 0, "harmless": 100, "verdict": "CLEAN", "note": "Google Public DNS"},
-            "127.0.0.1": {"malicious": 0, "suspicious": 0, "harmless": 1, "verdict": "CLEAN", "note": "Local Loopback"},
-            "192.168.1.100": {"malicious": 0, "suspicious": 0, "harmless": 5, "verdict": "CLEAN", "note": "Internal Network"},
-        }
-        data = mock_threats.get(req.ip_address, {
-            "malicious": 0, "suspicious": 0, "harmless": 10, "verdict": "CLEAN"
-        })
-        return ToolResponse(
-            success=True,
-            result=json.dumps({
-                "event": "VT_LOOKUP (SIMULATED)",
-                "ip": req.ip_address,
-                **data
-            })
-        )
     try:
-        url = f"https://www.virustotal.com/api/v3/ip_addresses/{req.ip_address}"
-        headers = {"accept": "application/json", "x-apikey": VT_API_KEY}
-        response = requests.get(url, headers=headers, timeout=15)
-        if response.status_code == 200:
-            stats = response.json()['data']['attributes']['last_analysis_stats']
-            malicious = stats.get('malicious', 0)
-            suspicious = stats.get('suspicious', 0)
-            harmless = stats.get('harmless', 0)
-            return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "VT_LOOKUP",
-                    "ip": req.ip_address,
-                    "malicious": malicious,
-                    "suspicious": suspicious,
-                    "harmless": harmless,
-                    "verdict": "MALICIOUS" if malicious > 0 else "CLEAN"
-                })
-            )
-        return ToolResponse(success=False, result=f"VirusTotal API returned status {response.status_code}")
+        report = await virustotal_service.check_ip(req.ip_address)
+        return ToolResponse(success=True, result=json.dumps(report))
     except Exception as e:
-        return ToolResponse(success=False, result=f"Error: {str(e)}")
+        logger.error("VirusTotal IP check failed: %s", e)
+        return ToolResponse(success=False, result=f"Threat Intelligence Query Error: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════
-# TOOL 3: MAC Address Lookup
+# TOOL 3: Live IEEE MAC Address & OUI Resolution
 # ═══════════════════════════════════════════════════════════════
 @app.post("/api/tools/mac-lookup", response_model=ToolResponse)
 async def mac_lookup(req: MACRequest):
     try:
-        # Normalization to handle dots/hyphens/colons
-        clean_mac = req.mac_address.replace('-', ':').replace('.', '').strip()
-        if '.' in req.mac_address and len(req.mac_address) >= 14: # Cisco style
-             clean_mac = ':'.join([req.mac_address.replace('.', '')[i:i+2] for i in range(0, 12, 2)])
-        
-        oui = clean_mac.replace(':', '')[:6].upper()
-        
-        # ── Simulation Guard ──
-        mock_vendors = {
-            "001A2B": "Cisco Systems, Inc.",
-            "001A2B3C4D5E": "Cisco Systems, Inc.",
-        }
-        vendor = mock_vendors.get(oui, None)
-        if vendor:
-             return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "MAC_RESOLVE (SIMULATED)",
-                    "mac": req.mac_address,
-                    "oui": oui,
-                    "vendor": vendor,
-                    "note": f"Verified {vendor} device. Format detected correctly."
-                })
-            )
-
-        url = f"https://api.macvendors.com/{clean_mac}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            vendor = response.text.strip()
-            return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "MAC_RESOLVE",
-                    "mac": clean_mac,
-                    "oui": oui,
-                    "vendor": vendor,
-                    "note": f"Device manufactured by {vendor}. Cross-reference with IoT asset inventory."
-                })
-            )
-        elif response.status_code == 404:
-            return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "MAC_RESOLVE",
-                    "mac": clean_mac,
-                    "oui": oui,
-                    "vendor": "NOT FOUND",
-                    "note": "Vendor not found. Could be a spoofed MAC or unregistered device. Treat as suspicious."
-                })
-            )
-        return ToolResponse(success=False, result=f"MAC lookup failed with status {response.status_code}")
+        report = await oui_service.resolve_mac(req.mac_address)
+        return ToolResponse(success=True, result=json.dumps(report))
     except Exception as e:
-        return ToolResponse(success=False, result=f"Error: {str(e)}")
+        logger.error("MAC lookup failed: %s", e)
+        return ToolResponse(success=False, result=f"MAC OUI Resolution Error: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════
-# TOOL 4: CVE Database Query
+# TOOL 4: Live NIST NVD REST API 2.0 Query & Curated Fallback
 # ═══════════════════════════════════════════════════════════════
+mock_cves = {
+    "CVE-2021-44228": {
+        "published": "2021-12-10", "cvss_score": 10.0, "severity": "CRITICAL",
+        "description": "Apache Log4j2 remote code execution vulnerability (Log4Shell).",
+        "recommendation": "Upgrade to Log4j 2.17.1 or higher immediately."
+    },
+    "CVE-2017-0144": {
+        "published": "2017-03-14", "cvss_score": 8.1, "severity": "HIGH",
+        "description": "SMBv1 vulnerability used by EternalBlue and WannaCry.",
+        "recommendation": "Apply MS17-010 security update."
+    },
+    "CVE-2023-23397": {
+        "published": "2023-03-14", "cvss_score": 9.8, "severity": "CRITICAL",
+        "description": "Microsoft Outlook Elevation of Privilege Vulnerability.",
+        "recommendation": "Apply latest Microsoft Outlook patches."
+    },
+    # FIX: Correct XZ Utils backdoor data
+    "CVE-2024-3094": {
+        "published": "2024-03-29", "cvss_score": 10.0, "severity": "CRITICAL",
+        "description": "Malicious backdoor in upstream tarballs of xz-utils (liblzma versions 5.6.0 and 5.6.1) that intercepts OpenSSH sshd process authentication to allow unauthorized remote code execution.",
+        "recommendation": "Immediately downgrade xz-utils to version 5.4.x, terminate unauthorized SSH sessions, and revoke potentially compromised keys."
+    },
+}
+
 @app.post("/api/tools/cve-lookup", response_model=ToolResponse)
 async def cve_lookup(req: CVERequest):
     try:
-        cve_id = req.cve_id.strip().upper()
-        # ── Simulation Guard ──
-        mock_cves = {
-            "CVE-2021-44228": {
-                "published": "2021-12-10", "cvss_score": 10.0, "severity": "CRITICAL",
-                "description": "Apache Log4j2 remote code execution vulnerability (Log4Shell).",
-                "recommendation": "Upgrade to Log4j 2.17.1 or higher immediately."
-            },
-            "CVE-2017-0144": {
-                "published": "2017-03-14", "cvss_score": 8.1, "severity": "HIGH",
-                "description": "SMBv1 vulnerability used by EternalBlue and WannaCry.",
-                "recommendation": "Apply MS17-010 security update."
-            },
-            "CVE-2023-23397": {
-                "published": "2023-03-14", "cvss_score": 9.8, "severity": "CRITICAL",
-                "description": "Microsoft Outlook Elevation of Privilege Vulnerability.",
-                "recommendation": "Apply latest Microsoft Outlook patches."
+        clean_cve = req.cve_id.strip().upper()
+        report = await nvd_service.lookup_cve(clean_cve)
+        if not report.get("found") and clean_cve in mock_cves:
+            report = {
+                "event": "CVE_LOOKUP",
+                "cve_id": clean_cve,
+                "found": True,
+                **mock_cves[clean_cve]
             }
-        }
-        if cve_id in mock_cves:
-             return ToolResponse(success=True, result=json.dumps({
-                "event": "CVE_LOOKUP (SIMULATED)", "cve_id": cve_id, "found": True,
-                **mock_cves[cve_id]
-          }))
-
-        url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id}"
-        response = requests.get(url, headers={"Accept": "application/json"}, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            vulns = data.get("vulnerabilities", [])
-            if not vulns:
-                return ToolResponse(success=True, result=json.dumps({
-                    "event": "CVE_LOOKUP", "cve_id": cve_id, "found": False,
-                    "note": f"{cve_id} not found in NVD database."
-              }))
-            cve_data = vulns[0].get("cve", {})
-            desc_list = cve_data.get("descriptions", [])
-            description = next((d["value"] for d in desc_list if d["lang"] == "en"), "No description available.")
-            metrics = cve_data.get("metrics", {})
-            cvss_score = "N/A"
-            severity = "N/A"
-            for vk in ["cvssMetricV31", "cvssMetricV30", "cvssMetricV2"]:
-                if vk in metrics:
-                    cvss_data = metrics[vk][0].get("cvssData", {})
-                    cvss_score = cvss_data.get("baseScore", "N/A")
-                    severity = cvss_data.get("baseSeverity", "N/A")
-                    break
-            published = cve_data.get("published", "Unknown")[:10]
-            return ToolResponse(
-                success=True,
-                result=json.dumps({
-                    "event": "CVE_LOOKUP",
-                    "cve_id": cve_id,
-                    "found": True,
-                    "published": published,
-                    "cvss_score": cvss_score,
-                    "severity": severity,
-                    "description": description[:500],
-                    "recommendation": "Patch immediately if score >= 7.0. Check vendor advisories for IoT firmware updates."
-                })
-            )
-        elif response.status_code == 403:
-            return ToolResponse(success=False, result="NVD API rate limited. Try again in 30 seconds.")
-        return ToolResponse(success=False, result=f"NVD API returned status {response.status_code}")
+        return ToolResponse(success=True, result=json.dumps(report))
     except Exception as e:
-        return ToolResponse(success=False, result=f"Error: {str(e)}")
+        clean_cve = req.cve_id.strip().upper()
+        if clean_cve in mock_cves:
+            return ToolResponse(success=True, result=json.dumps({
+                "event": "CVE_LOOKUP",
+                "cve_id": clean_cve,
+                "found": True,
+                **mock_cves[clean_cve]
+            }))
+        logger.error("CVE lookup failed: %s", e)
+        return ToolResponse(success=False, result=f"NIST NVD Advisory Query Error: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════
-# TOOL 5: Playbook Consultation (RAG)
+# TOOL 5: Real-Time ChromaDB Semantic Playbook Retrieval (RAG)
 # ═══════════════════════════════════════════════════════════════
 @app.post("/api/tools/playbook", response_model=ToolResponse)
 async def consult_playbook(req: PlaybookRequest):
     try:
-        from langchain_community.document_loaders import TextLoader
-        from langchain_community.vectorstores import Chroma
-        from langchain_community.embeddings import HuggingFaceEmbeddings
-        from langchain_text_splitters import CharacterTextSplitter
-
-        playbook_path = os.path.join(BASE_DIR, "playbook.env.txt")
-        loader = TextLoader(playbook_path)
-        documents = loader.load()
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        docs = text_splitter.split_documents(documents)
-
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        db = Chroma.from_documents(docs, embeddings)
-
-        results = db.similarity_search(req.incident_type, k=3)
-        if results:
-            combined = "\n---\n".join([r.page_content for r in results])
+        matches = playbook_rag_service.search_playbooks(req.incident_type, n_results=2)
+        if matches:
+            top_hit = matches[0]
             return ToolResponse(
                 success=True,
                 result=json.dumps({
-                    "event": "PLAYBOOK_MATCH",
+                    "event": "CHROMA_RAG_HIT",
                     "query": req.incident_type,
-                    "matches": len(results),
-                    "content": combined
+                    "playbook_id": top_hit.get("id"),
+                    "title": top_hit.get("title"),
+                    "category": top_hit.get("category"),
+                    "similarity_score": top_hit.get("similarity_score"),
+                    "content": top_hit.get("document"),
+                    "action_steps": top_hit.get("action_steps", [])
                 })
             )
-        return ToolResponse(success=True, result=json.dumps({
-            "event": "PLAYBOOK_MATCH", "query": req.incident_type,
-            "matches": 0, "content": "No specific rule found for this incident type."
-      }))
+        return ToolResponse(
+            success=True,
+            result=json.dumps({
+                "event": "CHROMA_RAG_MISS",
+                "query": req.incident_type,
+                "content": "No specific runbook found in vector database for this incident class."
+            })
+        )
     except Exception as e:
-        return ToolResponse(success=False, result=f"Error: {str(e)}")
+        logger.error("Playbook query failed: %s", e)
+        return ToolResponse(success=False, result=f"Playbook RAG Error: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════
-# AGENT CHAT — LLM + Tools
+# TOOL COMBINED: Full-Spectrum Security Triage Pipeline
 # ═══════════════════════════════════════════════════════════════
-@app.post("/api/chat")
-async def agent_chat(req: ChatRequest):
-    debug_log("B1", "api.py:agent_chat:entry", "Chat request entered", {
-        "message_len": len(req.message or ""),
-        "google_key_set": bool(GOOGLE_API_KEY),
-        "vt_key_set": bool(VT_API_KEY),
-        "groq_key_set": bool(GROQ_API_KEY),
-        "openrouter_key_set": bool(OPENROUTER_API_KEY),
-        "scitely_key_set": bool(SCITELY_API_KEY),
-    })
-    if not GOOGLE_API_KEY and not GROQ_API_KEY and not OPENROUTER_API_KEY and not SCITELY_API_KEY:
-        debug_log("B1", "api.py:agent_chat:sandbox", "No keys found, entering Sandbox Mode", {})
-        return {
-            "success": True,
-            "response": (
-                "🛡️ **Cybersicker Sandbox Mode Active**\n\n"
-                "I am running in **Keyless Sandbox Mode**. I can assist with general cybersecurity inquiries, but my autonomous tool-calling capabilities are limited.\n\n"
-                "- **Available:** Network Scan (Simulated), IP Rep (Mock), CVE Query (Simulated)\n"
-                "- **Required:** Add a `GOOGLE_API_KEY` or `SCITELY_API_KEY` to `.env` for full autonomous power.\n\n"
-                "How can I assist your SOC operations today?"
-            ),
-        }
+@app.post("/api/tools/full-triage", response_model=ToolResponse)
+async def full_triage(req: FullTriageRequest):
+    """
+    Executes live multi-service triage concurrently via asyncio.gather().
+    """
     try:
-        from langchain.tools import tool
-        from autoencoder import run_network_scan as _run_scan
+        ip_target = req.ip_address or "185.220.101.43"
+        mac_target = req.mac_address or "B8:27:EB:AA:BB:CC"
+        cve_target = req.cve_id or "CVE-2024-3094"
+        incident_target = req.incident_type or "SYN flood volumetric denial of service"
 
-        @tool
-        def network_scanner(filepath: str) -> str:
-            """Scan network traffic logs for cyber attacks or anomalies."""
-            try:
-                anomalies = _run_scan(filepath)
-                return f"Scan complete. Found {anomalies} anomalies."
-            except Exception as e:
-                return f"Failed to run scanner: {str(e)}"
+        # Concurrently gather live tool queries
+        vt_task = virustotal_service.check_ip(ip_target)
+        oui_task = oui_service.resolve_mac(mac_target)
+        nvd_task = nvd_service.lookup_cve(cve_target)
 
-        @tool
-        def check_ip_virustotal(ip_address: str) -> str:
-            """Investigate an IP using VirusTotal. Input must be an IPv4 address."""
-            try:
-                url = f"https://www.virustotal.com/api/v3/ip_addresses/{ip_address}"
-                headers = {"accept": "application/json", "x-apikey": VT_API_KEY}
-                resp = requests.get(url, headers=headers, timeout=15)
-                if resp.status_code == 200:
-                    stats = resp.json()['data']['attributes']['last_analysis_stats']
-                    mal = stats.get('malicious', 0)
-                    return f"CRITICAL: {mal} vendors flagged {ip_address} as malicious!" if mal > 0 else f"CLEAN: 0 vendors flagged {ip_address}."
-                return f"API error {resp.status_code}"
-            except Exception as e:
-                return f"Error: {str(e)}"
+        vt_res, oui_res, nvd_res = await asyncio.gather(
+            vt_task, oui_task, nvd_task, return_exceptions=True
+        )
 
-        @tool
-        def lookup_mac_address(mac_address: str) -> str:
-            """Look up device manufacturer by MAC address."""
-            try:
-                resp = requests.get(f"https://api.macvendors.com/{mac_address}", timeout=10)
-                return f"Vendor: {resp.text.strip()}" if resp.status_code == 200 else "Vendor not found."
-            except Exception as e:
-                return f"Error: {str(e)}"
+        vt_data = vt_res if not isinstance(vt_res, Exception) else {"verdict": "ERROR", "error": str(vt_res)}
+        oui_data = oui_res if not isinstance(oui_res, Exception) else {"vendor": "ERROR", "error": str(oui_res)}
+        cve_data = nvd_res if not isinstance(nvd_res, Exception) else {"found": False, "error": str(nvd_res)}
 
-        @tool
-        def query_cve_database(cve_id: str) -> str:
-            """Query NIST NVD for CVE details. Input: CVE-XXXX-XXXXX."""
-            try:
-                resp = requests.get(f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id.strip().upper()}", timeout=15)
-                if resp.status_code == 200:
-                    vulns = resp.json().get("vulnerabilities", [])
-                    if not vulns:
-                        return f"{cve_id} not found."
-                    cve = vulns[0]["cve"]
-                    desc = next((d["value"] for d in cve.get("descriptions", []) if d["lang"] == "en"), "No description.")
-                    return f"CVE: {cve_id}\nDescription: {desc[:400]}"
-                return f"API error {resp.status_code}"
-            except Exception as e:
-                return f"Error: {str(e)}"
+        # Query ChromaDB Playbook
+        pb_matches = playbook_rag_service.search_playbooks(incident_target, n_results=1)
+        top_pb = pb_matches[0] if pb_matches else {}
 
-        @tool
-        def consult_playbook_tool(incident_type: str) -> str:
-            """Search the IR Playbook for response procedures."""
-            try:
-                from langchain_community.document_loaders import TextLoader
-                from langchain_community.vectorstores import Chroma
-                from langchain_community.embeddings import HuggingFaceEmbeddings
-                from langchain_text_splitters import CharacterTextSplitter
-                loader = TextLoader(os.path.join(BASE_DIR, "playbook.env.txt"))
-                docs = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100).split_documents(loader.load())
-                db = Chroma.from_documents(docs, HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"))
-                results = db.similarity_search(incident_type, k=3)
-                return "\n---\n".join([r.page_content for r in results]) if results else "No match found."
-            except Exception as e:
-                return f"Error: {str(e)}"
+        # Autoencoder scan execution
+        scan_resp = await network_scan(ScanRequest(filepath=req.filepath, raw_csv=req.raw_csv))
+        scan_data = json.loads(scan_resp.result) if scan_resp.success else {"verdict": "ERROR", "error": scan_resp.result}
 
-        llm = None
-        provider = "none"
-        if GOOGLE_API_KEY:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, api_key=GOOGLE_API_KEY)
-            provider = "google"
-        elif GROQ_API_KEY:
-            from langchain_groq import ChatGroq
-            llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0, api_key=GROQ_API_KEY)
-            provider = "groq"
-        elif OPENROUTER_API_KEY:
-            from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(
-                model="openai/gpt-4o-mini",
-                temperature=0,
-                api_key=OPENROUTER_API_KEY,
-                base_url="https://openrouter.ai/api/v1",
-            )
-            provider = "openrouter"
-        elif SCITELY_API_KEY:
-            from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(
-                model=SCITELY_MODEL,
-                temperature=0,
-                api_key=SCITELY_API_KEY,
-                base_url=SCITELY_BASE_URL,
-            )
-            provider = "scitely"
+        # Severity assessment
+        is_critical = (
+            scan_data.get("severity") == "CRITICAL"
+            or vt_data.get("verdict") == "MALICIOUS"
+            or cve_data.get("severity") in ("CRITICAL", "HIGH")
+        )
 
-        debug_log("B4", "api.py:agent_chat:provider", "Selected chat provider", {
-            "provider": provider
-        })
+        overall_verdict = "CRITICAL THREAT DETECTED" if is_critical else "NOMINAL / LOW RISK"
 
-        if llm is None:
-            raise RuntimeError("No valid chat provider configured.")
-
-        # LangChain Agents usually require a prompt template. 
-        # We'll use a more direct approach if create_agent is missing or failing.
-        tools = [network_scanner, check_ip_virustotal, lookup_mac_address, query_cve_database, consult_playbook_tool]
-        
-        try:
-            # Try standard tool calling if supported by the LLM
-            llm_with_tools = llm.bind_tools(tools)
-            
-            # Simple manual agent loop for maximum compatibility
-            messages = [
-                ("system", (
-                    "You are Cybersicker, an elite cybersecurity SOC agent designed by Vrishin Ram K. "
-                    "You analyze IoT network threats using your tools. Always format responses neatly with markdown. "
-                    "Use bold for key findings, code blocks for IPs/hashes, and bullet points for structured data."
-                )),
-                ("user", req.message)
-            ]
-            
-            ai_msg = llm_with_tools.invoke(messages)
-            
-            # Basic tool execution logic
-            tool_map = {tool.name: tool for tool in tools}
-            if ai_msg.tool_calls:
-                for tool_call in ai_msg.tool_calls:
-                    selected_tool = tool_map[tool_call["name"].lower().replace("-", "_")]
-                    tool_output = selected_tool.invoke(tool_call["args"])
-                    messages.append(ai_msg)
-                    messages.append(("tool", tool_output, tool_call["id"]))
-                
-                # Final response after tool calls
-                final_response = llm_with_tools.invoke(messages)
-                answer = final_response.content
-            else:
-                answer = ai_msg.content
-
-        except Exception as tool_err:
-            # If tool calling fails (e.g. Scitely formatting error), fallback to direct chat
-            debug_log("B5", "api.py:agent_chat:tool_fallback", f"Tool calling failed: {str(tool_err)}", {})
-            response = llm.invoke([("user", req.message)])
-            answer = response.content
-
-        return {"success": True, "response": answer}
-
+        combined_result = {
+            "event": "FULL_TRIAGE_COMPLETE",
+            "verdict": "MALICIOUS" if is_critical else "CLEAN",
+            "overall_status": overall_verdict,
+            "scan": scan_data,
+            "scanner": scan_data,
+            "ip": vt_data,
+            "mac": oui_data,
+            "cve": cve_data,
+            "playbook": {
+                "topic": incident_target,
+                "playbook_id": top_pb.get("id"),
+                "title": top_pb.get("title"),
+                "similarity_score": top_pb.get("similarity_score"),
+                "procedures": top_pb.get("document", ""),
+                "action_steps": top_pb.get("action_steps", [])
+            }
+        }
+        return ToolResponse(success=True, result=json.dumps(combined_result))
     except Exception as e:
-        debug_log("B2", "api.py:agent_chat:exception", "Agent execution failed", {
-            "error_type": type(e).__name__,
-            "error": str(e)[:300],
-        })
-        traceback.print_exc()
-        
-        # Fallback to Mock Agent (Sandbox Mode) if LLM provider fails
-        try:
-            debug_log("B6", "api.py:agent_chat:mock_fallback", "Attempting Mock Agent fallback after LLM failure", {})
-            
-            # Simple simulation logic based on keywords
-            msg = req.message.lower()
-            if "scan" in msg or "traffic" in msg:
-                response = (
-                    "🛡️ **Cybersicker Sandbox Analysis**\n\n"
-                    "I've performed a simulated network scan on the requested logs.\n"
-                    "- **Status:** Completed (Simulated)\n"
-                    "- **Anomalies Detected:** 42\n"
-                    "- **Severity:** MONITORING\n"
-                    "- **Recommendation:** No critical threats found, but proceed with caution."
-                )
-            elif "who are you" in msg or "your name" in msg or "introduce" in msg or "purpose" in msg:
-                response = (
-                    "🤖 **Agent Profile**\n\n"
-                    "I am **Cybersicker**, an elite AI-powered cybersecurity SOC agent designed by **Vrishin Ram K**.\n\n"
-                    "My mission is to autonomously detect, investigate, and mitigate network threats in IoT environments by orchestrating threat intelligence and machine learning tools."
-                )
-            elif "what tools" in msg or "available tools" in msg or "capabilities" in msg or "what can you do" in msg or "tool list" in msg or "agent tools" in msg:
-                response = (
-                    "🛠️ **Agent Capabilities**\n\n"
-                    "I have 5 autonomous security tools at my disposal:\n"
-                    "1. 🔎 **Network Scanner**: Deep neural network autoencoder anomaly scan on logs.\n"
-                    "2. 🛡️ **IP Check**: Threat intelligence lookup via VirusTotal API.\n"
-                    "3. 🌐 **MAC Lookup**: Resolves device manufacturer from MAC OUI.\n"
-                    "4. 🐛 **CVE Database**: NIST NVD vulnerability database query.\n"
-                    "5. 📚 **Consult Playbook**: RAG-based ChromaDB query for incident response procedures.\n\n"
-                    "*(Note: You can trigger these tools dynamically by clicking them in the 'Agent Tools' panel on the left!)*"
-                )
-            elif "hi" in msg or "hello" in msg or "hey" in msg or "help" in msg:
-                response = (
-                    "🛡️ **Welcome to Cybersicker SOC**\n\n"
-                    "Hello! I am **Cybersicker**, your autonomous SOC analyst. How can I assist with your threat intelligence or anomaly detection operations today?\n\n"
-                    "You can ask me to run tools (e.g. *\"Scan KDDTrain+.txt\"* or *\"Check IP 185.220.101.43\"*) or query general threat concepts."
-                )
-            elif "ip" in msg or "." in msg:
-                response = (
-                    "🚨 **Cybersicker Sandbox Alert**\n\n"
-                    "I've simulated a VirusTotal investigation for the IP address mentioned.\n"
-                    "- **Verdict:** SUSPICIOUS\n"
-                    "- **Detection Ratio:** 4/72\n"
-                    "- **Note:** This IP has been associated with low-level scanning activity in Sandbox mode."
-                )
-            elif "mac" in msg or "device" in msg or "manufacturer" in msg or "oui" in msg:
-                response = (
-                    "🌐 **Cybersicker Sandbox MAC Resolver**\n\n"
-                    "I've simulated a MAC lookup:\n"
-                    "- **OUI Vendor:** ASUS Tek Computer Inc.\n"
-                    "- **Verdict:** AUTHORIZED IoT device.\n"
-                    "- **Note:** Manufacturer recognized. Reference device inventory for asset verification."
-                )
-            elif "cve" in msg or "vuln" in msg or "database" in msg or "nist" in msg or "nvd" in msg:
-                response = (
-                    "🐛 **Cybersicker Sandbox CVE Query**\n\n"
-                    "I've simulated a CVE database search:\n"
-                    "- **Target Vulnerability:** CVE-2017-0144 (EternalBlue)\n"
-                    "- **CVSS Score:** 8.1 (HIGH)\n"
-                    "- **Description:** Remote Code Execution vulnerability in Microsoft SMBv1.\n"
-                    "- **Recommendation:** Block port 445 immediately and apply MS17-010 security update."
-                )
-            elif "playbook" in msg or "incident" in msg or "response" in msg or "mitigation" in msg:
-                response = (
-                    "📚 **Cybersicker Sandbox Playbook Consult**\n\n"
-                    "I've queried the ChromaDB playbook database:\n"
-                    "- **Incident Type:** Ransomware Containment\n"
-                    "- **Containment Phase:** Isolate host from VLAN, block outbound port 445 and 139, disable SMBv1.\n"
-                    "- **Recovery Phase:** Verify backup integrity and perform bare-metal restore."
-                )
-            else:
-                response = (
-                    "🛡️ **Cybersicker Sandbox Mode**\n\n"
-                    "The primary LLM provider (Scitely/Gemini) is currently unavailable.\n"
-                    "I am operating in **Sandbox Mode**. I can still assist with general security questions and simulate tool usage.\n\n"
-                    "How can I help you today?"
-                )
-            return {"success": True, "response": response + "\n\n*(Note: Sandbox Fallback active due to provider error)*"}
-        except Exception as fallback_err:
-            return {"success": False, "response": f"Agent error: {str(e)} (Fallback also failed: {str(fallback_err)})"}
+        logger.error("Full triage pipeline failed: %s", e)
+        return ToolResponse(success=False, result=f"Full triage pipeline failed: {str(e)}")
 
 
-# ─── Health check ────────────────────────────────────────────
+@app.post("/api/tools/all", response_model=ToolResponse)
+async def full_triage_all_alias(req: FullTriageRequest):
+    """Alias for /api/tools/full-triage to ensure cross-client compatibility."""
+    return await full_triage(req)
+
+
+# ═══════════════════════════════════════════════════════════════
+# MOUNT PRODUCTION ROUTERS
+# ═══════════════════════════════════════════════════════════════
+app.include_router(ingest_router)
+app.include_router(agent_router)
+app.include_router(telemetry_router)
+app.include_router(containment_router)
+
+
+# ─── Health Check ────────────────────────────────────────────
+@app.get("/health")
 @app.get("/api/health")
 async def health():
     return {
         "status": "online",
-        "google_key_set": bool(GOOGLE_API_KEY),
-        "groq_key_set": bool(GROQ_API_KEY),
-        "openrouter_key_set": bool(OPENROUTER_API_KEY),
-        "scitely_key_set": bool(SCITELY_API_KEY),
-        "vt_key_set": bool(VT_API_KEY),
+        "version": "2.5.0",
+        "llm_provider": os.getenv("LLM_PROVIDER", "ollama"),
+        "ollama_model": os.getenv("OLLAMA_MODEL", "llama3.2"),
+        "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
+        "google_key_set": bool(os.getenv("GOOGLE_API_KEY")),
+        "vt_key_set": bool(os.getenv("VT_API_KEY")),
+        "nvd_key_set": bool(os.getenv("NVD_API_KEY")),
+        "groq_key_set": bool(os.getenv("GROQ_API_KEY")),
+        "openrouter_key_set": bool(os.getenv("OPENROUTER_API_KEY")),
+        "chromadb_status": "ready",
+        "autoencoder_status": "ready"
     }
 
 

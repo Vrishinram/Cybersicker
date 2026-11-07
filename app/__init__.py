@@ -1,0 +1,2 @@
+"""CYBERSICKER Application Package"""
+

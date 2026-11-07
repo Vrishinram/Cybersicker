@@ -10,7 +10,7 @@ run-api:
 	uvicorn api:app --reload --port 8000
 
 run-ui:
-	streamlit run app.py
+	cd frontend && npm run dev
 
 run-cli:
 	python agent.py
