@@ -257,35 +257,16 @@ def generate_deterministic_report(prompt: str, context: Dict[str, Any]) -> str:
         prompt_lower = prompt.lower()
 
         # Check for tools / capabilities inquiry
-        if any(k in prompt_lower for k in ["tool", "tools", "capabilities", "what can you do", "who are you", "what do you have", "help", "arsenal"]):
+        if any(k in prompt_lower for k in ["tool", "tools", "capabilities", "what can you do", "who are you", "what do you have", "tool list", "agent tools", "arsenal"]):
             return (
-                "### [CYBERSICKER ARSENAL] Available Blue-Team Security Tools\n\n"
-                "I am **Cybersicker**, an autonomous Blue-Team SOC Analyst and Incident Response Agent created by **Vrishin Ram.K**.\n\n"
-                "Here are my **5 primary security analysis tools**:\n\n"
-                "1. **Network Traffic Anomaly Scan (Keras Autoencoder)**\n"
-                "   - Evaluates network packet flows against the NSL-KDD baseline using a 16→8→16 deep neural autoencoder.\n"
-                "   - Detects zero-day network intrusions, volumetric surges, and anomalous packet flows using reconstruction Mean Squared Error (MSE) loss.\n"
-                "   - **Sample Directive**: `Scan KDDTrain+.txt`\n\n"
-                "2. **VirusTotal Threat Intelligence**\n"
-                "   - Live threat intelligence querying the VirusTotal v3 API.\n"
-                "   - Assesses global reputation for target IPv4 addresses, reports vendor detection ratios, scores malicious posture, and attributes ISP/ASN origins.\n"
-                "   - **Sample Directive**: `Analyze IP 185.220.101.43` or `Analyze IP 8.8.8.8`\n\n"
-                "3. **NIST NVD CVE Advisory**\n"
-                "   - Live vulnerability correlation using the NIST National Vulnerability Database (REST API 2.0).\n"
-                "   - Retrieves authoritative CVSS v3.1 base scores, exploitability/impact subscores, CWE weakness vectors, and remediation advisories.\n"
-                "   - **Sample Directive**: `Query CVE-2024-3094` or `Query CVE-2021-44228`\n\n"
-                "4. **Hardware OUI Resolution**\n"
-                "   - Layer 2 MAC address resolution via the IEEE Organizationally Unique Identifier (OUI) database.\n"
-                "   - Identifies hardware device manufacturers, profiles asset classes (IoT sensors, gateways, network NICs), and flags Locally Administered Addresses (LAA) / randomized MACs.\n"
-                "   - **Sample Directive**: `Resolve MAC B8:27:EB:AA:BB:CC`\n\n"
-                "5. **Consult Playbook (RAG)**\n"
-                "   - Autonomous incident response runbook retrieval powered by ChromaDB persistent vector search.\n"
-                "   - Delivers NIST CSF 2.0 and MITRE ATT&CK-aligned Standard Operating Procedures (SOPs) for incident containment with ready-to-run CLI commands (sysctl, iptables, ufw, switchport).\n"
-                "   - **Sample Directive**: `Provide SYN flood mitigation runbook` or `Ransomware outbreak containment`\n\n"
-                "---\n"
-                "#### Full Pipeline Execution:\n"
-                "You can trigger all 5 tools concurrently in a unified pipeline by clicking the **Run All Tools** button or entering:\n"
-                "`Execute full triage pipeline across all available threat vectors`"
+                "🛠️ **Agent Capabilities**\n\n"
+                "I have 5 autonomous security tools at my disposal:\n\n"
+                "1. 🔎 **Network Scanner** — Keras autoencoder anomaly scan on traffic logs\n"
+                "2. 🛡️ **IP Check** — VirusTotal threat intelligence & reputation\n"
+                "3. 🌐 **MAC Lookup** — IEEE OUI manufacturer resolution\n"
+                "4. 🐛 **CVE Database** — NIST NVD vulnerability lookup\n"
+                "5. 📚 **Consult Playbook** — RAG-based incident response procedures\n\n"
+                "You can trigger them by asking naturally (e.g. *\"Scan KDDTrain+.txt\"*, *\"Check IP 185.220.101.43\"*, *\"Lookup CVE-2024-3094\"*) or by using the tool buttons on the left."
             )
 
         # Check for Autoencoder / Anomaly detection inquiry

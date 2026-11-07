@@ -74,42 +74,17 @@ export async function POST(req: Request) {
   if (isToolsQuery) {
     return NextResponse.json({
       success: true,
-      response: `### [CYBERSICKER ARSENAL] Available Blue-Team Security Tools
+      response: `🛠️ **Agent Capabilities**
 
-I am **Cybersicker**, an autonomous Blue-Team SOC Analyst and Incident Response Agent created by **Vrishin Ram.K**.
+I have 5 autonomous security tools at my disposal:
 
-Here are my **5 primary security analysis tools**:
+1. 🔎 **Network Scanner** — Keras autoencoder anomaly scan on traffic logs
+2. 🛡️ **IP Check** — VirusTotal threat intelligence & reputation
+3. 🌐 **MAC Lookup** — IEEE OUI manufacturer resolution
+4. 🐛 **CVE Database** — NIST NVD vulnerability lookup
+5. 📚 **Consult Playbook** — RAG-based incident response procedures
 
-1. **Network Traffic Anomaly Scan (Keras Autoencoder)**
-   - **Engine:** 16→8→16 deep neural autoencoder trained on the NSL-KDD benchmark dataset.
-   - **Function:** Detects zero-day network intrusions, volumetric surges, and anomalous packet flows using reconstruction Mean Squared Error (MSE) loss with calibrated threshold filtering.
-   - **Sample Directive:** \`Scan KDDTrain+.txt\`
-
-2. **VirusTotal Threat Intelligence**
-   - **Engine:** VirusTotal v3 REST API.
-   - **Function:** Queries real-time global threat intelligence for remote IPv4 addresses, evaluates multi-engine detection ratios, classifies reputation (Clean, Suspicious, Malicious), and attributes ISP/ASN origins.
-   - **Sample Directive:** \`Analyze IP 185.220.101.43\` or \`Analyze IP 8.8.8.8\`
-
-3. **NIST NVD CVE Advisory**
-   - **Engine:** NIST National Vulnerability Database (REST API 2.0).
-   - **Function:** Correlates CVE identifiers to retrieve authoritative CVSS v3.1 base scores, exploitability/impact subscores, CWE weakness vectors, and remediation advisories.
-   - **Sample Directive:** \`Query CVE-2024-3094\` or \`Query CVE-2021-44228\`
-
-4. **Hardware OUI Resolution**
-   - **Engine:** IEEE Organizationally Unique Identifier (OUI) MAC database.
-   - **Function:** Resolves physical Layer 2 MAC addresses to registered hardware vendors, profiles device categories (IoT sensors, gateways, network NICs), and flags Locally Administered Addresses (LAA) / randomized MACs.
-   - **Sample Directive:** \`Resolve MAC B8:27:EB:AA:BB:CC\`
-
-5. **Consult Playbook (RAG)**
-   - **Engine:** ChromaDB Persistent Semantic Vector Store.
-   - **Function:** Retrieves NIST CSF 2.0 and MITRE ATT&CK-aligned Standard Operating Procedures (SOPs) for incident containment with ready-to-run CLI commands (sysctl, iptables, ufw).
-   - **Sample Directive:** \`Provide SYN flood mitigation runbook\` or \`Ransomware outbreak containment\`
-
----
-
-#### Full Pipeline Execution:
-You can trigger all 5 tools concurrently in a unified pipeline by clicking the **Run All Tools** button or submitting:
-\`Execute full triage pipeline across all available threat vectors\``,
+You can trigger them by asking naturally (e.g. *"Scan KDDTrain+.txt"*, *"Check IP 185.220.101.43"*, *"Lookup CVE-2024-3094"*) or by using the tool buttons on the left.`,
     });
   }
 

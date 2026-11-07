@@ -186,7 +186,7 @@ export default function ChatFeed({
                 e.stopPropagation();
                 onRunFullPipeline();
               }}
-              className="btn-primary text-xs py-1.5 px-3.5 shrink-0 ml-4 cursor-pointer hover:brightness-110 active:scale-95 transition-all shadow-md font-semibold"
+              className="btn-primary text-xs py-1.5 px-3 shrink-0 ml-4"
             >
               Run All Tools
             </button>
